@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package pitaya.room;
+
+import "pitaya/common.proto";
+import "pitaya/event.proto";
+
+option go_package = "github.com/example/game/gen/pitaya/room;room";
+
+message JoinReq {
+  string room_id = 1;
+  optional string password = 2;
+}
+
+message JoinRsp {
+  string room_id = 1;
+  string game_id = 2;
+  pitaya.common.RoomMode room_mode = 3;
+}
+
+message ReadyReq {
+  string room_id = 1;
+}
+
+message ReadyRsp {}
+
+message LeaveReq {
+  string room_id = 1;
+  string reason = 2;
+}
+
+message LeaveRsp {}
+
+// 断线补发 — since_action_seq 之后的事件
+message SyncReq {
+  string room_id = 1;
+  string round_id = 2;
+  uint32 since_action_seq = 3;  // 0 表示从头（仅重连且未错过事件时用）
+}
+
+message SyncRsp {
+  string round_id = 1;
+  uint32 latest_action_seq = 2;
+  repeated pitaya.event.GameEvent events = 3;
+  // Handler 将 events 转为 Push 下发；或直接带 push_route + serialized push
+  repeated SyncPushItem pushes = 4;
+}
+
+message SyncPushItem {
+  string push_route = 1;
+  bytes push_body = 2;  // 已含 EventMeta 的 Push proto
+}
+
+message RoomStatePush {
+  pitaya.common.PushHeader header = 1;
+  pitaya.common.RoomPhase phase = 2;
+  pitaya.common.RoomMode room_mode = 3;
+  repeated pitaya.common.PlayerSeat players = 4;
+  uint32 round_no = 5;
+  int64 base_score = 6;
+}

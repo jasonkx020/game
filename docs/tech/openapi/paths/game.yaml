@@ -1,0 +1,59 @@
+/v1/games:
+  get:
+    tags:
+      - Game
+    summary: 已接入游戏列表
+    operationId: listGames
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../components/schemas.yaml#/GameMeta'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/games/{game_id}/config:
+  get:
+    tags:
+      - Game
+    summary: 游戏运营配置（房卡消耗、记分场场次）
+    operationId: getGameConfig
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: game_id
+        in: path
+        required: true
+        schema:
+          type: string
+          example: dawugui
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/GameConfig'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'

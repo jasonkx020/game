@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package pitaya.event;
+
+import "pitaya/common.proto";
+
+option go_package = "github.com/example/game/gen/pitaya/event;event";
+
+// 规范化局内事件 — 落库 payload，Live/Replay 共用
+message GameEvent {
+  oneof body {
+    RoomStateEvent room_state = 1;
+    DealEvent deal = 2;
+    TurnEvent turn = 3;
+    PlayEvent play = 4;
+    PassEvent pass = 5;
+    AlertEvent alert = 6;
+    RoundInvalidEvent round_invalid = 7;
+    SettlementEvent settlement = 8;
+  }
+}
+
+message RoomStateEvent {
+  pitaya.common.RoomPhase phase = 1;
+  pitaya.common.RoomMode room_mode = 2;
+  repeated pitaya.common.PlayerSeat players = 3;
+  uint32 round_no = 4;
+  int64 base_score = 5;
+}
+
+message DealEvent {
+  repeated uint32 hand_cards = 1;  // 落库存完整；Push 按 seat 掩码
+  uint32 first_seat = 2;
+  uint32 dealer_seat = 3;
+  uint32 target_seat = 4;          // Push 目标座位（0=广播需 Handler 拆分）
+}
+
+message TurnEvent {
+  uint32 current_seat = 1;
+  uint32 timeout_ms = 2;
+  bool must_play = 3;
+  uint32 last_play_seat = 4;
+}
+
+message PlayEvent {
+  uint32 seat = 1;
+  repeated uint32 cards = 2;
+  uint32 play_type = 3;  // 1=play
+  uint32 next_seat = 4;
+}
+
+message PassEvent {
+  uint32 seat = 1;
+  uint32 next_seat = 2;
+}
+
+message AlertEvent {
+  uint64 user_id = 1;
+  uint32 seat = 2;
+  uint32 hand_count = 3;
+}
+
+message RoundInvalidEvent {
+  uint32 reason_code = 1;
+  string message = 2;
+}
+
+message SettlementEvent {
+  bool is_valid = 1;
+  uint64 winner_id = 2;
+  repeated EventPlayerScore scores = 3;
+  optional EventPlayerScore liability = 4;
+  int64 rake_amount = 5;
+  repeated EventFinalHand final_hands = 6;
+}
+
+message EventPlayerScore {
+  uint64 user_id = 1;
+  uint32 seat = 2;
+  int32 rule_score = 3;
+}
+
+message EventFinalHand {
+  uint64 user_id = 1;
+  uint32 seat = 2;
+  repeated uint32 cards = 3;
+}
+
+// 游戏私有扩展 — 新游戏使用 game_payload bytes 或独立 proto
+message GameEventExtension {
+  string game_id = 1;
+  bytes game_payload = 2;
+}

@@ -1,0 +1,9 @@
+bin/
+.env
+*.exe
+web/admin/node_modules/
+web/admin/dist/
+client/node_modules/
+client/library/
+client/temp/
+client/local/

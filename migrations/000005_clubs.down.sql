@@ -1,0 +1,4 @@
+ALTER TABLE room DROP COLUMN IF EXISTS club_id;
+DROP TABLE IF EXISTS club_room_card_pool;
+DROP TABLE IF EXISTS club_member;
+DROP TABLE IF EXISTS club;

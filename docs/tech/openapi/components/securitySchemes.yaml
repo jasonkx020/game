@@ -1,0 +1,13 @@
+bearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: 登录后获得的 access_token
+
+signatureAuth:
+  type: apiKey
+  in: header
+  name: X-Signature
+  description: |
+    HMAC-SHA256 请求签名，与 X-App-Id、X-Timestamp、X-Nonce、X-Content-SHA256 配合使用。
+    算法详见 docs/tech/openapi/http-signature.md

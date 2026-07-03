@@ -1,0 +1,107 @@
+/v1/wallet/room-card:
+  get:
+    tags:
+      - Wallet
+    summary: 查询平台房卡余额
+    operationId: getRoomCardBalance
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/WalletBalance'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/wallet/game-coin/{game_id}:
+  get:
+    tags:
+      - Wallet
+    summary: 查询指定游戏金币余额
+    operationId: getGameCoinBalance
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: game_id
+        in: path
+        required: true
+        schema:
+          type: string
+          example: dawugui
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/GameCoinBalance'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+/v1/wallet/room-card/recharge:
+  post:
+    tags: [Wallet]
+    summary: Mock 房卡充值（开发环境）
+    operationId: mockRechargeRoomCard
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [product_id]
+            properties:
+              product_id:
+                type: string
+                enum: [rc_10, rc_50, rc_200]
+    responses:
+      '200':
+        description: 成功
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+/v1/wallet/recharge/history:
+  get:
+    tags: [Wallet]
+    summary: 充值流水
+    operationId: listRechargeHistory
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+

@@ -1,0 +1,13 @@
+{
+  "game_id": "dawugui",
+  "room_card_cost": {
+    "3": 2,
+    "4": 2,
+    "5": 3
+  },
+  "register_gift": {
+    "game_coin": 5000,
+    "room_card": 5
+  },
+  "coin_name": "龟币"
+}

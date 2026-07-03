@@ -1,0 +1,228 @@
+/v1/clubs:
+  post:
+    tags: [Club]
+    summary: 创建俱乐部
+    operationId: createClub
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+    responses:
+      '201':
+        description: 已创建
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/clubs/{club_id}:
+  get:
+    tags:
+      - Club
+    summary: 查询俱乐部信息
+    operationId: getClub
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/ClubSummary'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+/v1/clubs/{club_id}/members:
+  get:
+    tags: [Club]
+    summary: 成员列表
+    operationId: listClubMembers
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 成功
+  post:
+    tags: [Club]
+    summary: 邀请/添加成员
+    operationId: addClubMember
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [user_id]
+            properties:
+              user_id:
+                type: integer
+                format: int64
+    responses:
+      '200':
+        description: 成功
+
+/v1/clubs/{club_id}/members/{user_id}:
+  delete:
+    tags: [Club]
+    summary: 踢出成员
+    operationId: removeClubMember
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 成功
+
+/v1/clubs/{club_id}/room-card:
+  get:
+    tags: [Club]
+    summary: 俱乐部房卡池余额
+    operationId: getClubRoomCardPool
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 成功
+
+/v1/clubs/{club_id}/room-card/transfer:
+  post:
+    tags: [Club]
+    summary: 管理员向俱乐部池划拨房卡
+    operationId: transferClubRoomCard
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: club_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount]
+            properties:
+              amount:
+                type: integer
+                format: int64
+    responses:
+      '200':
+        description: 成功
+
+/v1/admin/clubs:
+  get:
+    tags: [Club]
+    summary: 运营后台俱乐部列表
+    operationId: adminListClubs
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

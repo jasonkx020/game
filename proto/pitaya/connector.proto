@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package pitaya.connector;
+
+option go_package = "github.com/example/game/gen/pitaya/connector;connector";
+
+message EntryReq {
+  string client_version = 1;
+  string platform = 2;  // android / ios / wechat / h5
+}
+
+message EntryRsp {
+  string server_version = 1;
+  uint32 heartbeat_interval_sec = 2;
+}
+
+message BindReq {
+  string access_token = 1;  // JWT from HTTP login
+}
+
+message BindRsp {
+  uint64 user_id = 1;
+  string nickname = 2;
+}

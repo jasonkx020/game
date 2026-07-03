@@ -1,0 +1,55 @@
+XAppId:
+  name: X-App-Id
+  in: header
+  required: true
+  description: 客户端应用标识，用于查找 app_secret
+  schema:
+    type: string
+    example: cocos-android
+
+XTimestamp:
+  name: X-Timestamp
+  in: header
+  required: true
+  description: Unix 秒级 UTC 时间戳
+  schema:
+    type: integer
+    format: int64
+    example: 1719980000
+
+XNonce:
+  name: X-Nonce
+  in: header
+  required: true
+  description: 单次请求唯一 UUID，防重放
+  schema:
+    type: string
+    format: uuid
+    example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+XContentSha256:
+  name: X-Content-SHA256
+  in: header
+  required: true
+  description: 请求体 SHA256 十六进制小写；无 Body 时为 empty hash
+  schema:
+    type: string
+    pattern: '^[a-f0-9]{64}$'
+    example: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+XSignature:
+  name: X-Signature
+  in: header
+  required: true
+  description: HMAC-SHA256 签名十六进制小写，算法见 http-signature.md
+  schema:
+    type: string
+    pattern: '^[a-f0-9]{64}$'
+
+SignatureHeaders:
+  name: SignatureHeaders
+  in: header
+  description: 签名校验所需 Header 组合（文档用，实际为 X-App-Id 等五个独立 Header）
+  required: false
+  schema:
+    type: string

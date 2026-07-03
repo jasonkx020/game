@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package pitaya.common;
+
+option go_package = "github.com/example/game/gen/pitaya/common;common";
+
+enum RoomPhase {
+  ROOM_PHASE_UNSPECIFIED = 0;
+  IDLE = 1;
+  DEALING = 2;
+  PLAYING = 3;
+  SETTLEMENT = 4;
+}
+
+enum RoomMode {
+  ROOM_MODE_UNSPECIFIED = 0;
+  ROOM_CARD = 1;
+  SCORE_FIELD = 2;
+}
+
+// 局内有序元数据 — 所有 Push 必含，与 game_action_log 同源
+message EventMeta {
+  uint64 audit_sn = 1;
+  uint32 action_seq = 2;   // 局内从 1 递增
+  string round_id = 3;
+  uint32 round_no = 4;
+  string room_id = 5;
+  int64 server_ts = 6;
+}
+
+message PushHeader {
+  EventMeta meta = 1;
+  string game_id = 2;
+}
+
+message ErrorPush {
+  PushHeader header = 1;
+  uint32 code = 2;
+  string message = 3;
+  uint64 ref_audit_sn = 4;
+}
+
+message PlayerSeat {
+  uint64 user_id = 1;
+  uint32 seat = 2;
+  string nickname = 3;
+  bool ready = 4;
+  bool online = 5;
+}

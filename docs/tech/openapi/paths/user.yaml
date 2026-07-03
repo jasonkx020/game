@@ -1,0 +1,24 @@
+/v1/user/profile:
+  get:
+    tags:
+      - User
+    summary: 获取当前用户资料
+    operationId: getUserProfile
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/UserProfile'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

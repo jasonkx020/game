@@ -1,0 +1,63 @@
+/v1/auth/login:
+  post:
+    tags:
+      - Auth
+    summary: 短信验证码登录
+    operationId: authLogin
+    description: 无需 Bearer Token，但必须携带 HMAC 签名 Header（见 http-signature.md）
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: 登录成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/LoginResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/SignatureInvalid'
+
+/v1/auth/refresh:
+  post:
+    tags:
+      - Auth
+    summary: 刷新 access_token
+    operationId: authRefresh
+    description: Authorization 为空串参与签名；无需有效 Bearer
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RefreshRequest'
+    responses:
+      '200':
+        description: 刷新成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/LoginResponse'
+      '401':
+        $ref: '../components/responses.yaml#/SignatureInvalid'

@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS recharge_order;
+DROP TABLE IF EXISTS game_ops_config;
+DROP TABLE IF EXISTS game_catalog;
+ALTER TABLE users DROP COLUMN IF EXISTS role;

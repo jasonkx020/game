@@ -1,0 +1,568 @@
+ApiError:
+  type: object
+  required:
+    - code
+    - message
+    - request_id
+  properties:
+    code:
+      type: integer
+      description: 业务错误码，0 表示成功（仅用于统一 wrapper 时）
+      example: 2001
+    message:
+      type: string
+      example: 房卡不足
+    request_id:
+      type: string
+      format: uuid
+    audit_sn:
+      type: integer
+      format: int64
+      description: 敏感操作审计号，可选
+
+PageResult:
+  type: object
+  required:
+    - items
+    - total
+    - page
+    - page_size
+  properties:
+    items:
+      type: array
+      items: {}
+    total:
+      type: integer
+      format: int64
+    page:
+      type: integer
+      minimum: 1
+    page_size:
+      type: integer
+      minimum: 1
+      maximum: 100
+
+WalletBalance:
+  type: object
+  required:
+    - balance
+    - updated_at
+  properties:
+    balance:
+      type: integer
+      format: int64
+      description: 余额（房卡张数或游戏币数量）
+    updated_at:
+      type: string
+      format: date-time
+
+GameCoinBalance:
+  allOf:
+    - $ref: '#/WalletBalance'
+    - type: object
+      required:
+        - game_id
+        - coin_name
+      properties:
+        game_id:
+          type: string
+          example: dawugui
+        coin_name:
+          type: string
+          example: 龟币
+
+LoginRequest:
+  type: object
+  required:
+    - phone
+    - sms_code
+  properties:
+    phone:
+      type: string
+      example: "13800138000"
+    sms_code:
+      type: string
+      example: "123456"
+    device_id:
+      type: string
+
+LoginResponse:
+  type: object
+  required:
+    - access_token
+    - refresh_token
+    - expires_in
+    - user_id
+  properties:
+    access_token:
+      type: string
+    refresh_token:
+      type: string
+    expires_in:
+      type: integer
+      description: access_token 有效秒数
+    user_id:
+      type: integer
+      format: int64
+    sign_key_version:
+      type: string
+      description: 当前 app_secret 版本号，客户端据此选择签名密钥
+      example: v1
+
+RefreshRequest:
+  type: object
+  required:
+    - refresh_token
+  properties:
+    refresh_token:
+      type: string
+
+UserProfile:
+  type: object
+  required:
+    - user_id
+    - nickname
+  properties:
+    user_id:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatar_url:
+      type: string
+      format: uri
+    phone_masked:
+      type: string
+      example: "138****8000"
+
+CreateRoomRequest:
+  type: object
+  required:
+    - game_id
+    - room_mode
+    - player_count
+  properties:
+    game_id:
+      type: string
+      example: dawugui
+    room_mode:
+      type: string
+      enum:
+        - room_card
+        - score_field
+    player_count:
+      type: integer
+      minimum: 3
+      maximum: 5
+    club_id:
+      type: integer
+      format: int64
+      description: 俱乐部开房可选
+    tier_id:
+      type: string
+      description: 记分场场次 ID，room_mode=score_field 时必填
+
+CreateRoomResponse:
+  type: object
+  required:
+    - room_id
+    - ws_url
+    - room_card_cost
+    - audit_sn
+  properties:
+    room_id:
+      type: string
+    ws_url:
+      type: string
+      format: uri
+      description: WebSocket 连接地址
+    room_card_cost:
+      type: integer
+      description: 扣除房卡数，记分场为 0
+    audit_sn:
+      type: integer
+      format: int64
+
+RoomSummary:
+  type: object
+  required:
+    - room_id
+    - game_id
+    - room_mode
+    - status
+    - player_count
+    - max_players
+  properties:
+    room_id:
+      type: string
+    game_id:
+      type: string
+    room_mode:
+      type: string
+      enum:
+        - room_card
+        - score_field
+    status:
+      type: string
+      enum:
+        - waiting
+        - playing
+        - closed
+    player_count:
+      type: integer
+    max_players:
+      type: integer
+
+JoinRoomRequest:
+  type: object
+  properties:
+    password:
+      type: string
+
+GameMeta:
+  type: object
+  required:
+    - game_id
+    - name
+    - min_players
+    - max_players
+  properties:
+    game_id:
+      type: string
+    name:
+      type: string
+    min_players:
+      type: integer
+    max_players:
+      type: integer
+    icon_url:
+      type: string
+      format: uri
+
+GameConfig:
+  type: object
+  required:
+    - game_id
+    - room_card_cost
+  properties:
+    game_id:
+      type: string
+    room_card_cost:
+      type: object
+      additionalProperties:
+        type: integer
+      description: 玩家人数 -> 房卡消耗，如 "4": 2
+    tiers:
+      type: array
+      items:
+        $ref: '#/ScoreTier'
+
+ScoreTier:
+  type: object
+  required:
+    - tier_id
+    - name
+    - base_score
+    - min_coin
+  properties:
+    tier_id:
+      type: string
+    name:
+      type: string
+    base_score:
+      type: integer
+      format: int64
+    min_coin:
+      type: integer
+      format: int64
+
+ClubSummary:
+  type: object
+  required:
+    - club_id
+    - name
+    - member_count
+  properties:
+    club_id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    member_count:
+      type: integer
+    room_card_pool:
+      type: integer
+      format: int64
+      description: 俱乐部房卡池余额
+
+EventMeta:
+  type: object
+  required:
+    - audit_sn
+    - action_seq
+    - round_id
+    - round_no
+    - room_id
+    - server_ts
+  properties:
+    audit_sn:
+      type: integer
+      format: int64
+    action_seq:
+      type: integer
+      minimum: 1
+    round_id:
+      type: string
+      format: uuid
+    round_no:
+      type: integer
+      minimum: 1
+    room_id:
+      type: string
+      format: uuid
+    server_ts:
+      type: string
+      format: date-time
+
+RoundSummary:
+  type: object
+  required:
+    - round_id
+    - room_id
+    - round_no
+    - game_id
+    - status
+    - started_at
+  properties:
+    round_id:
+      type: string
+      format: uuid
+    room_id:
+      type: string
+      format: uuid
+    round_no:
+      type: integer
+    game_id:
+      type: string
+      example: dawugui
+    status:
+      type: string
+      enum: [playing, ended, invalid]
+    started_at:
+      type: string
+      format: date-time
+    ended_at:
+      type: string
+      format: date-time
+    winner_user_ids:
+      type: array
+      items:
+        type: integer
+        format: int64
+
+MatchSummary:
+  allOf:
+    - $ref: '#/RoundSummary'
+    - type: object
+      required:
+        - my_rule_score
+        - is_winner
+      properties:
+        my_rule_score:
+          type: integer
+          description: 当前用户本局规则积分
+        my_coin_delta:
+          type: integer
+          format: int64
+          description: 记分场龟币变动，房卡场可为 0
+        is_winner:
+          type: boolean
+        replay_available:
+          type: boolean
+          description: 是否有可回放数据（ended 且未过期）
+
+ActionLogEntry:
+  type: object
+  required:
+    - action_seq
+    - audit_sn
+    - event_type
+    - push_route
+    - payload
+    - server_ts
+  properties:
+    action_seq:
+      type: integer
+      minimum: 1
+    audit_sn:
+      type: integer
+      format: int64
+    event_type:
+      type: string
+      enum: [ROOM_STATE, DEAL, TURN, PLAY, PASS, ALERT, ROUND_INVALID, SETTLEMENT]
+    push_route:
+      type: string
+      example: onPlayResult
+    payload:
+      type: string
+      format: byte
+      description: proto GameEvent 序列化 base64
+    server_ts:
+      type: string
+      format: date-time
+    actor_user_id:
+      type: integer
+      format: int64
+
+FinalHand:
+  type: object
+  required:
+    - user_id
+    - seat
+    - cards
+  properties:
+    user_id:
+      type: integer
+      format: int64
+    seat:
+      type: integer
+    cards:
+      type: array
+      items:
+        type: integer
+
+PlayerReplayInfo:
+  type: object
+  required:
+    - user_id
+    - seat
+  properties:
+    user_id:
+      type: integer
+      format: int64
+    seat:
+      type: integer
+    nickname:
+      type: string
+
+SettlementSummary:
+  type: object
+  properties:
+    is_valid:
+      type: boolean
+    winner_id:
+      type: integer
+      format: int64
+    scores:
+      type: array
+      items:
+        type: object
+        properties:
+          user_id:
+            type: integer
+            format: int64
+          seat:
+            type: integer
+          rule_score:
+            type: integer
+
+RoundReplayResponse:
+  type: object
+  required:
+    - round
+    - players
+    - events
+  properties:
+    round:
+      $ref: '#/RoundSummary'
+    players:
+      type: array
+      items:
+        $ref: '#/PlayerReplayInfo'
+    events:
+      type: array
+      items:
+        $ref: '#/ActionLogEntry'
+    final_hands:
+      type: array
+      items:
+        $ref: '#/FinalHand'
+      description: 仅 round.status=ended 时返回
+    settlement:
+      $ref: '#/SettlementSummary'
+
+RoomReplayRoundItem:
+  type: object
+  required:
+    - round
+    - event_count
+  properties:
+    round:
+      $ref: '#/RoundSummary'
+    event_count:
+      type: integer
+    settlement:
+      $ref: '#/SettlementSummary'
+
+RoomReplayResponse:
+  type: object
+  required:
+    - room_id
+    - rounds
+  properties:
+    room_id:
+      type: string
+      format: uuid
+    game_id:
+      type: string
+    rounds:
+      type: array
+      items:
+        $ref: '#/RoomReplayRoundItem'
+    total_rounds:
+      type: integer
+
+MatchListResponse:
+  allOf:
+    - $ref: '#/PageResult'
+    - type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/MatchSummary'
+
+ActionLogPageResponse:
+  allOf:
+    - $ref: '#/PageResult'
+    - type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/ActionLogEntry'
+        round_id:
+          type: string
+          format: uuid
+        latest_action_seq:
+          type: integer
+
+AuditActionQueryResponse:
+  type: object
+  required:
+    - entry
+  properties:
+    entry:
+      $ref: '#/ActionLogEntry'
+    context_before:
+      type: array
+      items:
+        $ref: '#/ActionLogEntry'
+      description: 同局前 N 条（默认 5）
+    context_after:
+      type: array
+      items:
+        $ref: '#/ActionLogEntry'
+      description: 同局后 N 条（默认 5）
+    round:
+      $ref: '#/RoundSummary'

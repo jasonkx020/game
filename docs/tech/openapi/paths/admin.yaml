@@ -1,0 +1,44 @@
+/v1/admin/metrics/overview:
+  get:
+    tags: [Audit]
+    summary: 运营 KPI 概览
+    operationId: adminMetricsOverview
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/metrics/room-cards:
+  get:
+    tags: [Audit]
+    summary: 房卡销售/消耗趋势
+    operationId: adminMetricsRoomCards
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: days
+        in: query
+        schema:
+          type: integer
+          default: 7
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

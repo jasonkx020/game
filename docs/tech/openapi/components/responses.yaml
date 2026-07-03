@@ -1,0 +1,52 @@
+BadRequest:
+  description: 请求参数错误
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+Unauthorized:
+  description: 未登录或 Token 失效
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+SignatureInvalid:
+  description: 签名校验失败、时间戳过期或 Nonce 重放（code 1002/1003/1004）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        code: 1002
+        message: 签名校验失败
+        request_id: 550e8400-e29b-41d4-a716-446655440000
+
+Forbidden:
+  description: 无权限或风控拒绝
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+NotFound:
+  description: 资源不存在
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+Conflict:
+  description: 幂等冲突或状态冲突
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+InternalError:
+  description: 服务器内部错误
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'

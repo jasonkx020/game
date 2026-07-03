@@ -1,0 +1,121 @@
+/v1/rooms:
+  post:
+    tags:
+      - Room
+    summary: 创建房间（房卡场扣房卡）
+    operationId: createRoom
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/CreateRoomRequest'
+    responses:
+      '201':
+        description: 创建成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/CreateRoomResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '409':
+        description: 房卡不足或幂等冲突
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/ApiError'
+
+/v1/rooms/{room_id}:
+  get:
+    tags:
+      - Room
+    summary: 查询房间摘要
+    operationId: getRoom
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: room_id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/RoomSummary'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+/v1/rooms/{room_id}/join:
+  post:
+    tags:
+      - Room
+    summary: 加入房间（HTTP 侧校验，进房后连 WS）
+    operationId: joinRoom
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: room_id
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/JoinRoomRequest'
+    responses:
+      '200':
+        description: 可加入，返回 WS 地址
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ws_url
+              properties:
+                ws_url:
+                  type: string
+                  format: uri
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'

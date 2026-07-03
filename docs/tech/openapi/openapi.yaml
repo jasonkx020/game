@@ -1,0 +1,159 @@
+openapi: 3.0.3
+info:
+  title: 游戏平台 HTTP API
+  description: |
+    平台 HTTP REST 接口，遵循 OpenAPI 3.0。
+    所有请求须携带 HMAC-SHA256 签名 Header，详见 docs/tech/openapi/http-signature.md。
+    游戏内实时消息走 Pitaya WebSocket + Protobuf，见 docs/tech/protocol.md。
+  version: 1.0.0
+  contact:
+    name: Platform Team
+
+servers:
+  - url: https://api.example.com
+    description: 生产环境
+  - url: https://api-staging.example.com
+    description: 预发环境
+
+tags:
+  - name: Auth
+    description: 登录与 Token
+  - name: User
+    description: 用户资料
+  - name: Wallet
+    description: 房卡与游戏金币
+  - name: Room
+    description: 房间管理
+  - name: Club
+    description: 俱乐部与代理
+  - name: Game
+    description: 游戏列表与配置
+  - name: Replay
+    description: 战绩与对局回放
+  - name: Audit
+    description: 运营审计与报表
+
+security:
+  - bearerAuth: []
+    signatureAuth: []
+
+paths:
+  /v1/auth/login:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1login'
+  /v1/auth/refresh:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1refresh'
+  /v1/user/profile:
+    $ref: './paths/user.yaml#/~1v1~1user~1profile'
+  /v1/wallet/room-card:
+    $ref: './paths/wallet.yaml#/~1v1~1wallet~1room-card'
+  /v1/wallet/game-coin/{game_id}:
+    $ref: './paths/wallet.yaml#/~1v1~1wallet~1game-coin~1{game_id}'
+  /v1/wallet/room-card/recharge:
+    $ref: './paths/wallet.yaml#/~1v1~1wallet~1room-card~1recharge'
+  /v1/wallet/recharge/history:
+    $ref: './paths/wallet.yaml#/~1v1~1wallet~1recharge~1history'
+  /v1/rooms:
+    $ref: './paths/room.yaml#/~1v1~1rooms'
+  /v1/rooms/{room_id}:
+    $ref: './paths/room.yaml#/~1v1~1rooms~1{room_id}'
+  /v1/rooms/{room_id}/join:
+    $ref: './paths/room.yaml#/~1v1~1rooms~1{room_id}~1join'
+  /v1/clubs/{club_id}:
+    $ref: './paths/club.yaml#/~1v1~1clubs~1{club_id}'
+  /v1/clubs:
+    $ref: './paths/club.yaml#/~1v1~1clubs'
+  /v1/clubs/{club_id}/members:
+    $ref: './paths/club.yaml#/~1v1~1clubs~1{club_id}~1members'
+  /v1/clubs/{club_id}/members/{user_id}:
+    $ref: './paths/club.yaml#/~1v1~1clubs~1{club_id}~1members~1{user_id}'
+  /v1/clubs/{club_id}/room-card:
+    $ref: './paths/club.yaml#/~1v1~1clubs~1{club_id}~1room-card'
+  /v1/clubs/{club_id}/room-card/transfer:
+    $ref: './paths/club.yaml#/~1v1~1clubs~1{club_id}~1room-card~1transfer'
+  /v1/admin/clubs:
+    $ref: './paths/club.yaml#/~1v1~1admin~1clubs'
+  /v1/admin/metrics/overview:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1overview'
+  /v1/admin/metrics/room-cards:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1room-cards'
+  /v1/games:
+    $ref: './paths/game.yaml#/~1v1~1games'
+  /v1/games/{game_id}/config:
+    $ref: './paths/game.yaml#/~1v1~1games~1{game_id}~1config'
+  /v1/users/me/matches:
+    $ref: './paths/replay.yaml#/~1v1~1users~1me~1matches'
+  /v1/rounds/{round_id}/replay:
+    $ref: './paths/replay.yaml#/~1v1~1rounds~1{round_id}~1replay'
+  /v1/rooms/{room_id}/replay:
+    $ref: './paths/replay.yaml#/~1v1~1rooms~1{room_id}~1replay'
+  /v1/rounds/{round_id}/events:
+    $ref: './paths/replay.yaml#/~1v1~1rounds~1{round_id}~1events'
+  /v1/admin/audit/actions:
+    $ref: './paths/replay.yaml#/~1v1~1admin~1audit~1actions'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './components/securitySchemes.yaml#/bearerAuth'
+    signatureAuth:
+      $ref: './components/securitySchemes.yaml#/signatureAuth'
+  schemas:
+    ApiError:
+      $ref: './components/schemas.yaml#/ApiError'
+    PageResult:
+      $ref: './components/schemas.yaml#/PageResult'
+    WalletBalance:
+      $ref: './components/schemas.yaml#/WalletBalance'
+    GameCoinBalance:
+      $ref: './components/schemas.yaml#/GameCoinBalance'
+    LoginRequest:
+      $ref: './components/schemas.yaml#/LoginRequest'
+    LoginResponse:
+      $ref: './components/schemas.yaml#/LoginResponse'
+    UserProfile:
+      $ref: './components/schemas.yaml#/UserProfile'
+    CreateRoomRequest:
+      $ref: './components/schemas.yaml#/CreateRoomRequest'
+    CreateRoomResponse:
+      $ref: './components/schemas.yaml#/CreateRoomResponse'
+    RoomSummary:
+      $ref: './components/schemas.yaml#/RoomSummary'
+    GameMeta:
+      $ref: './components/schemas.yaml#/GameMeta'
+    GameConfig:
+      $ref: './components/schemas.yaml#/GameConfig'
+    ClubSummary:
+      $ref: './components/schemas.yaml#/ClubSummary'
+    EventMeta:
+      $ref: './components/schemas.yaml#/EventMeta'
+    RoundSummary:
+      $ref: './components/schemas.yaml#/RoundSummary'
+    MatchSummary:
+      $ref: './components/schemas.yaml#/MatchSummary'
+    ActionLogEntry:
+      $ref: './components/schemas.yaml#/ActionLogEntry'
+    FinalHand:
+      $ref: './components/schemas.yaml#/FinalHand'
+    RoundReplayResponse:
+      $ref: './components/schemas.yaml#/RoundReplayResponse'
+    RoomReplayResponse:
+      $ref: './components/schemas.yaml#/RoomReplayResponse'
+    MatchListResponse:
+      $ref: './components/schemas.yaml#/MatchListResponse'
+    AuditActionQueryResponse:
+      $ref: './components/schemas.yaml#/AuditActionQueryResponse'
+  responses:
+    BadRequest:
+      $ref: './components/responses.yaml#/BadRequest'
+    Unauthorized:
+      $ref: './components/responses.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './components/responses.yaml#/Forbidden'
+    NotFound:
+      $ref: './components/responses.yaml#/NotFound'
+    Conflict:
+      $ref: './components/responses.yaml#/Conflict'
+    InternalError:
+      $ref: './components/responses.yaml#/InternalError'
+    SignatureInvalid:
+      $ref: './components/responses.yaml#/SignatureInvalid'

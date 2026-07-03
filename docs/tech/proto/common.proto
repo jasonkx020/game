@@ -1,0 +1,10 @@
+// DEPRECATED — 见 proto/DEPRECATED.md
+// 旧 Envelope 方案已移除，请使用 proto/pitaya/
+
+syntax = "proto3";
+
+package game.common.deprecated;
+
+option go_package = "github.com/example/game/deprecated/common";
+
+// 占位，禁止在新代码中引用。
