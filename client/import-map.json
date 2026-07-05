@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "@bufbuild/protobuf/wire": "./node_modules/@bufbuild/protobuf/dist/esm/wire/index.js"
+  }
+}

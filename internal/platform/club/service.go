@@ -201,8 +201,8 @@ func (s *Service) TransferToPool(ctx context.Context, clubID, userID, amount int
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO wallet_ledger (user_id, wallet_type, delta, balance_after, reason, ref_id, audit_sn)
-		 VALUES ($1, 'room_card', $2, $3, 'club_pool_transfer', $4, $5)`,
-		userID, -amount, newBal, fmt.Sprintf("club:%d", clubID), auditSN); err != nil {
+		 VALUES ($1, 'room_card', $2, $3, 'club_pool_transfer', NULL, $4)`,
+		userID, -amount, newBal, auditSN); err != nil {
 		return 0, err
 	}
 

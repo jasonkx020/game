@@ -34,7 +34,7 @@ func (c *Committer) CommitEvents(ctx context.Context, room *runtime.RoomRuntime,
 		}
 		seat := int16(ev.Seat)
 		var seatPtr *int16
-		if ev.Seat > 0 || ev.Type == engine.EventPlay || ev.Type == engine.EventPass {
+		if ev.Seat > 0 || ev.Type == engine.EventPlay || ev.Type == engine.EventPass || ev.Type == engine.EventMove {
 			seatPtr = &seat
 		}
 		if err := c.Log.Insert(ctx, actionlog.Entry{
@@ -73,6 +73,20 @@ func EventToPush(room *runtime.RoomRuntime, ev engine.GameEvent, auditSN uint64)
 	}
 
 	switch ev.PushRoute {
+	case "onBoardInit":
+		if b := ge.GetBoardInit(); b != nil {
+			return &pb.BoardInitPush{Header: header, Cells: b.Cells, FirstSeat: b.FirstSeat}, nil
+		}
+	case "onMoveResult":
+		if m := ge.GetMove(); m != nil {
+			captured := make([]*pb.CapturedCell, len(m.Captured))
+			for i, c := range m.Captured {
+				captured[i] = &pb.CapturedCell{Row: c.Row, Col: c.Col}
+			}
+			return &pb.MoveResultPush{Header: header, Seat: m.Seat,
+				FromRow: m.FromRow, FromCol: m.FromCol, ToRow: m.ToRow, ToCol: m.ToCol,
+				Captured: captured, NextSeat: m.NextSeat}, nil
+		}
 	case "onDeal":
 		if d := ge.GetDeal(); d != nil {
 			return &pb.DealPush{Header: header, RoundId: room.RoundID.String(), HandCards: d.HandCards,

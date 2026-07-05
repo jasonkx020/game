@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "creator": {
-    "version": "3.8.4"
+    "version": "3.8.8",
+    "registry": {
+      "remote": {}
+    }
   },
   "scripts": {
     "test": "vitest run",
@@ -16,5 +19,6 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.3"
-  }
+  },
+  "uuid": "63cf8ce9-61d7-4def-8fed-f4e083371265"
 }

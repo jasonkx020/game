@@ -4,7 +4,7 @@
 
 ## 前置
 
-- Cocos Creator **3.8.x**
+- Cocos Creator **3.8.8**（`package.json` 中 `creator.version` 已锁定；请用同版本编辑器打开 `client/`）
 - Node.js 18+（运行 Vitest / 生成 proto）
 - 后端 `make run-api` + `make run-game` 已启动
 
@@ -27,13 +27,18 @@ npm test
 
 ## Cocos 工程设置
 
-1. 用 Cocos Creator 打开 **`client/`** 目录
-2. 创建三个场景并命名：`Launch`、`Hall`、`Room`
-3. 挂载脚本（`assets/scripts/scenes/`）：
+1. 安装 npm 依赖（proto 生成代码依赖 `@bufbuild/protobuf/wire`）：
+   ```bash
+   cd client && npm install
+   ```
+2. 用 Cocos Creator 打开 **`client/`** 目录（Import Map 已写入 `settings/v2/packages/project.json`，指向 `import-map.json`；若仍报模块找不到，请重启编辑器）
+3. 创建场景并命名：`Launch`、`Hall`、`Room`、**`Liuzichong`**（六子冲棋盘）
+4. 挂载脚本（`assets/scripts/scenes/` 与 `assets/games/liuzichong/`）：
    - **Launch**：`LaunchScene` + 两个 EditBox（手机号/验证码）+ 登录按钮 → `onLoginClick`
-   - **Hall**：`HallScene` + Label（用户/房卡）+ 按钮 → `onQuickCreateRoom`
-   - **Room**：`RoomScene` + Label（Push 日志）+ 占位按钮 → `onPassClick` / `onPlayClick`
-4. Build Settings 将 **Launch** 设为起始场景
+   - **Hall**：`HallScene` + Label（用户/房卡）+ 按钮 → `onCreateDawuguiRoom` / `onCreateLiuzichongRoom`
+   - **Room**：`RoomScene` + Label（Push 日志）；打乌龟可保留 `onPassClick` / `onPlayClick`
+   - **Liuzichong**：`LiuzichongScene` 或 `LiuzichongBoard` + 可选 Label（`statusLabel` / `overlayLabel`）+ 返回按钮 → `onBackToHall`
+5. Build Settings 将 **Launch** 设为起始场景
 
 ## 联调流程
 
@@ -41,7 +46,9 @@ npm test
 2. `make run-api`（:8080）与 `make run-game`（:3250 WS）
 3. Cocos 运行 Launch 场景
 4. 默认 dev 登录：`13800000001` / `123456`
-5. Hall → 快速开房 → Room 应看到 Pitaya Push 日志（`onRoomState`、`onDeal` 等）
+5. Hall → 选游戏开房 → Room 进房后：
+   - **打乌龟**：留在 Room，看 Push 日志
+   - **六子冲**：自动进入 Liuzichong 场景，2 人 ready 后可走子
 
 ## SDK 目录
 
@@ -54,6 +61,8 @@ assets/platform/sdk/
   GameSession.ts     进房闭环编排
   ReplayPlayer.ts    回放骨架（P2）
 assets/games/dawugui/DawuguiPushHandler.ts
+assets/games/liuzichong/LiuzichongPushHandler.ts
+assets/games/liuzichong/LiuzichongBoard.ts
 ```
 
 ## 配置

@@ -18,6 +18,7 @@ import (
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/handlers/connector"
 	"github.com/example/game/internal/pitaya/handlers/dawugui"
+	"github.com/example/game/internal/pitaya/handlers/liuzichong"
 	roomh "github.com/example/game/internal/pitaya/handlers/room"
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/platform/actionlog"
@@ -62,8 +63,9 @@ func main() {
 	session.DefaultSessionPool = builder.SessionPool
 
 	pitaya.Register(connector.New(cfg), component.WithName("connector"))
-	pitaya.Register(roomh.New(store, committer, gen, logRepo), component.WithName("room"))
+	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB), component.WithName("room"))
 	pitaya.Register(dawugui.New(store, committer, gen, logRepo), component.WithName("dawugui"))
+	pitaya.Register(liuzichong.New(store, committer, gen, logRepo), component.WithName("liuzichong"))
 
 	slog.Info("game server listening", "port", cfg.PitayaWSPort)
 	pitaya.Start()

@@ -17,6 +17,8 @@ message GameEvent {
     AlertEvent alert = 6;
     RoundInvalidEvent round_invalid = 7;
     SettlementEvent settlement = 8;
+    BoardInitEvent board_init = 9;
+    MoveEvent move = 10;
   }
 }
 
@@ -84,6 +86,26 @@ message EventFinalHand {
   uint64 user_id = 1;
   uint32 seat = 2;
   repeated uint32 cards = 3;
+}
+
+message BoardInitEvent {
+  repeated uint32 cells = 1;
+  uint32 first_seat = 2;
+}
+
+message MoveCapturedCell {
+  uint32 row = 1;
+  uint32 col = 2;
+}
+
+message MoveEvent {
+  uint32 seat = 1;
+  uint32 from_row = 2;
+  uint32 from_col = 3;
+  uint32 to_row = 4;
+  uint32 to_col = 5;
+  repeated MoveCapturedCell captured = 6;
+  uint32 next_seat = 7;
 }
 
 // 游戏私有扩展 — 新游戏使用 game_payload bytes 或独立 proto

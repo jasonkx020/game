@@ -8,12 +8,20 @@ import (
 	"github.com/example/game/internal/game/engine"
 )
 
+type SeatRole int
+
+const (
+	SeatRolePlayer SeatRole = iota
+	SeatRoleSpectator // reserved for future observer seats
+)
+
 type Seat struct {
 	UserID   uint64
 	Seat     uint32
 	Nickname string
 	Ready    bool
 	Online   bool
+	Role     SeatRole
 }
 
 type RoomRuntime struct {
@@ -46,7 +54,7 @@ func (s *Store) GetOrCreate(roomID uuid.UUID, gameID string, maxPlayers int) *Ro
 	}
 	r := &RoomRuntime{
 		RoomID: roomID, GameID: gameID,
-		Seats: make(map[uint64]*Seat),
+		Seats:  make(map[uint64]*Seat),
 		Config: engine.GameConfig{GameID: gameID, Players: maxPlayers, BaseScore: 1},
 	}
 	s.rooms[roomID] = r
@@ -63,20 +71,32 @@ func (s *Store) Get(roomID uuid.UUID) (*RoomRuntime, bool) {
 func (r *RoomRuntime) Lock()   { r.mu.Lock() }
 func (r *RoomRuntime) Unlock() { r.mu.Unlock() }
 
+func (r *RoomRuntime) PlayerCount() int {
+	n := 0
+	for _, s := range r.Seats {
+		if s.Role == SeatRolePlayer {
+			n++
+		}
+	}
+	return n
+}
+
 func (r *RoomRuntime) Players() []engine.Player {
 	out := make([]engine.Player, 0, len(r.Seats))
 	for _, s := range r.Seats {
-		out = append(out, engine.Player{UserID: s.UserID, Seat: s.Seat, Nickname: s.Nickname})
+		if s.Role == SeatRolePlayer {
+			out = append(out, engine.Player{UserID: s.UserID, Seat: s.Seat, Nickname: s.Nickname})
+		}
 	}
 	return out
 }
 
-func (r *RoomRuntime) AllReady() bool {
-	if len(r.Seats) < 3 {
+func (r *RoomRuntime) AllReady(minPlayers int) bool {
+	if r.PlayerCount() < minPlayers {
 		return false
 	}
 	for _, s := range r.Seats {
-		if !s.Ready {
+		if s.Role == SeatRolePlayer && !s.Ready {
 			return false
 		}
 	}

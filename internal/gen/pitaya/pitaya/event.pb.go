@@ -34,6 +34,8 @@ type GameEvent struct {
 	//	*GameEvent_Alert
 	//	*GameEvent_RoundInvalid
 	//	*GameEvent_Settlement
+	//	*GameEvent_BoardInit
+	//	*GameEvent_Move
 	Body          isGameEvent_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -148,6 +150,24 @@ func (x *GameEvent) GetSettlement() *SettlementEvent {
 	return nil
 }
 
+func (x *GameEvent) GetBoardInit() *BoardInitEvent {
+	if x != nil {
+		if x, ok := x.Body.(*GameEvent_BoardInit); ok {
+			return x.BoardInit
+		}
+	}
+	return nil
+}
+
+func (x *GameEvent) GetMove() *MoveEvent {
+	if x != nil {
+		if x, ok := x.Body.(*GameEvent_Move); ok {
+			return x.Move
+		}
+	}
+	return nil
+}
+
 type isGameEvent_Body interface {
 	isGameEvent_Body()
 }
@@ -184,6 +204,14 @@ type GameEvent_Settlement struct {
 	Settlement *SettlementEvent `protobuf:"bytes,8,opt,name=settlement,proto3,oneof"`
 }
 
+type GameEvent_BoardInit struct {
+	BoardInit *BoardInitEvent `protobuf:"bytes,9,opt,name=board_init,json=boardInit,proto3,oneof"`
+}
+
+type GameEvent_Move struct {
+	Move *MoveEvent `protobuf:"bytes,10,opt,name=move,proto3,oneof"`
+}
+
 func (*GameEvent_RoomState) isGameEvent_Body() {}
 
 func (*GameEvent_Deal) isGameEvent_Body() {}
@@ -199,6 +227,10 @@ func (*GameEvent_Alert) isGameEvent_Body() {}
 func (*GameEvent_RoundInvalid) isGameEvent_Body() {}
 
 func (*GameEvent_Settlement) isGameEvent_Body() {}
+
+func (*GameEvent_BoardInit) isGameEvent_Body() {}
+
+func (*GameEvent_Move) isGameEvent_Body() {}
 
 type RoomStateEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -848,6 +880,202 @@ func (x *EventFinalHand) GetCards() []uint32 {
 	return nil
 }
 
+type BoardInitEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cells         []uint32               `protobuf:"varint,1,rep,packed,name=cells,proto3" json:"cells,omitempty"`
+	FirstSeat     uint32                 `protobuf:"varint,2,opt,name=first_seat,json=firstSeat,proto3" json:"first_seat,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BoardInitEvent) Reset() {
+	*x = BoardInitEvent{}
+	mi := &file_pitaya_event_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BoardInitEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BoardInitEvent) ProtoMessage() {}
+
+func (x *BoardInitEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_pitaya_event_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BoardInitEvent.ProtoReflect.Descriptor instead.
+func (*BoardInitEvent) Descriptor() ([]byte, []int) {
+	return file_pitaya_event_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *BoardInitEvent) GetCells() []uint32 {
+	if x != nil {
+		return x.Cells
+	}
+	return nil
+}
+
+func (x *BoardInitEvent) GetFirstSeat() uint32 {
+	if x != nil {
+		return x.FirstSeat
+	}
+	return 0
+}
+
+type MoveCapturedCell struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Row           uint32                 `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
+	Col           uint32                 `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveCapturedCell) Reset() {
+	*x = MoveCapturedCell{}
+	mi := &file_pitaya_event_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveCapturedCell) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveCapturedCell) ProtoMessage() {}
+
+func (x *MoveCapturedCell) ProtoReflect() protoreflect.Message {
+	mi := &file_pitaya_event_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveCapturedCell.ProtoReflect.Descriptor instead.
+func (*MoveCapturedCell) Descriptor() ([]byte, []int) {
+	return file_pitaya_event_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *MoveCapturedCell) GetRow() uint32 {
+	if x != nil {
+		return x.Row
+	}
+	return 0
+}
+
+func (x *MoveCapturedCell) GetCol() uint32 {
+	if x != nil {
+		return x.Col
+	}
+	return 0
+}
+
+type MoveEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Seat          uint32                 `protobuf:"varint,1,opt,name=seat,proto3" json:"seat,omitempty"`
+	FromRow       uint32                 `protobuf:"varint,2,opt,name=from_row,json=fromRow,proto3" json:"from_row,omitempty"`
+	FromCol       uint32                 `protobuf:"varint,3,opt,name=from_col,json=fromCol,proto3" json:"from_col,omitempty"`
+	ToRow         uint32                 `protobuf:"varint,4,opt,name=to_row,json=toRow,proto3" json:"to_row,omitempty"`
+	ToCol         uint32                 `protobuf:"varint,5,opt,name=to_col,json=toCol,proto3" json:"to_col,omitempty"`
+	Captured      []*MoveCapturedCell    `protobuf:"bytes,6,rep,name=captured,proto3" json:"captured,omitempty"`
+	NextSeat      uint32                 `protobuf:"varint,7,opt,name=next_seat,json=nextSeat,proto3" json:"next_seat,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveEvent) Reset() {
+	*x = MoveEvent{}
+	mi := &file_pitaya_event_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveEvent) ProtoMessage() {}
+
+func (x *MoveEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_pitaya_event_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveEvent.ProtoReflect.Descriptor instead.
+func (*MoveEvent) Descriptor() ([]byte, []int) {
+	return file_pitaya_event_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *MoveEvent) GetSeat() uint32 {
+	if x != nil {
+		return x.Seat
+	}
+	return 0
+}
+
+func (x *MoveEvent) GetFromRow() uint32 {
+	if x != nil {
+		return x.FromRow
+	}
+	return 0
+}
+
+func (x *MoveEvent) GetFromCol() uint32 {
+	if x != nil {
+		return x.FromCol
+	}
+	return 0
+}
+
+func (x *MoveEvent) GetToRow() uint32 {
+	if x != nil {
+		return x.ToRow
+	}
+	return 0
+}
+
+func (x *MoveEvent) GetToCol() uint32 {
+	if x != nil {
+		return x.ToCol
+	}
+	return 0
+}
+
+func (x *MoveEvent) GetCaptured() []*MoveCapturedCell {
+	if x != nil {
+		return x.Captured
+	}
+	return nil
+}
+
+func (x *MoveEvent) GetNextSeat() uint32 {
+	if x != nil {
+		return x.NextSeat
+	}
+	return 0
+}
+
 // 游戏私有扩展 — 新游戏使用 game_payload bytes 或独立 proto
 type GameEventExtension struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -859,7 +1087,7 @@ type GameEventExtension struct {
 
 func (x *GameEventExtension) Reset() {
 	*x = GameEventExtension{}
-	mi := &file_pitaya_event_proto_msgTypes[11]
+	mi := &file_pitaya_event_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -871,7 +1099,7 @@ func (x *GameEventExtension) String() string {
 func (*GameEventExtension) ProtoMessage() {}
 
 func (x *GameEventExtension) ProtoReflect() protoreflect.Message {
-	mi := &file_pitaya_event_proto_msgTypes[11]
+	mi := &file_pitaya_event_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -884,7 +1112,7 @@ func (x *GameEventExtension) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameEventExtension.ProtoReflect.Descriptor instead.
 func (*GameEventExtension) Descriptor() ([]byte, []int) {
-	return file_pitaya_event_proto_rawDescGZIP(), []int{11}
+	return file_pitaya_event_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GameEventExtension) GetGameId() string {
@@ -905,7 +1133,7 @@ var File_pitaya_event_proto protoreflect.FileDescriptor
 
 const file_pitaya_event_proto_rawDesc = "" +
 	"\n" +
-	"\x12pitaya/event.proto\x12\fpitaya.event\x1a\x13pitaya/common.proto\"\xc9\x03\n" +
+	"\x12pitaya/event.proto\x12\fpitaya.event\x1a\x13pitaya/common.proto\"\xb7\x04\n" +
 	"\tGameEvent\x12=\n" +
 	"\n" +
 	"room_state\x18\x01 \x01(\v2\x1c.pitaya.event.RoomStateEventH\x00R\troomState\x12-\n" +
@@ -917,7 +1145,11 @@ const file_pitaya_event_proto_rawDesc = "" +
 	"\rround_invalid\x18\a \x01(\v2\x1f.pitaya.event.RoundInvalidEventH\x00R\froundInvalid\x12?\n" +
 	"\n" +
 	"settlement\x18\b \x01(\v2\x1d.pitaya.event.SettlementEventH\x00R\n" +
-	"settlementB\x06\n" +
+	"settlement\x12=\n" +
+	"\n" +
+	"board_init\x18\t \x01(\v2\x1c.pitaya.event.BoardInitEventH\x00R\tboardInit\x12-\n" +
+	"\x04move\x18\n" +
+	" \x01(\v2\x17.pitaya.event.MoveEventH\x00R\x04moveB\x06\n" +
 	"\x04body\"\xe5\x01\n" +
 	"\x0eRoomStateEvent\x12.\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x18.pitaya.common.RoomPhaseR\x05phase\x124\n" +
@@ -978,7 +1210,22 @@ const file_pitaya_event_proto_rawDesc = "" +
 	"\x0eEventFinalHand\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x04R\x06userId\x12\x12\n" +
 	"\x04seat\x18\x02 \x01(\rR\x04seat\x12\x14\n" +
-	"\x05cards\x18\x03 \x03(\rR\x05cards\"P\n" +
+	"\x05cards\x18\x03 \x03(\rR\x05cards\"E\n" +
+	"\x0eBoardInitEvent\x12\x14\n" +
+	"\x05cells\x18\x01 \x03(\rR\x05cells\x12\x1d\n" +
+	"\n" +
+	"first_seat\x18\x02 \x01(\rR\tfirstSeat\"6\n" +
+	"\x10MoveCapturedCell\x12\x10\n" +
+	"\x03row\x18\x01 \x01(\rR\x03row\x12\x10\n" +
+	"\x03col\x18\x02 \x01(\rR\x03col\"\xdc\x01\n" +
+	"\tMoveEvent\x12\x12\n" +
+	"\x04seat\x18\x01 \x01(\rR\x04seat\x12\x19\n" +
+	"\bfrom_row\x18\x02 \x01(\rR\afromRow\x12\x19\n" +
+	"\bfrom_col\x18\x03 \x01(\rR\afromCol\x12\x15\n" +
+	"\x06to_row\x18\x04 \x01(\rR\x05toRow\x12\x15\n" +
+	"\x06to_col\x18\x05 \x01(\rR\x05toCol\x12:\n" +
+	"\bcaptured\x18\x06 \x03(\v2\x1e.pitaya.event.MoveCapturedCellR\bcaptured\x12\x1b\n" +
+	"\tnext_seat\x18\a \x01(\rR\bnextSeat\"P\n" +
 	"\x12GameEventExtension\x12\x17\n" +
 	"\agame_id\x18\x01 \x01(\tR\x06gameId\x12!\n" +
 	"\fgame_payload\x18\x02 \x01(\fR\vgamePayloadB\x9a\x01\n" +
@@ -997,7 +1244,7 @@ func file_pitaya_event_proto_rawDescGZIP() []byte {
 	return file_pitaya_event_proto_rawDescData
 }
 
-var file_pitaya_event_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_pitaya_event_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_pitaya_event_proto_goTypes = []any{
 	(*GameEvent)(nil),          // 0: pitaya.event.GameEvent
 	(*RoomStateEvent)(nil),     // 1: pitaya.event.RoomStateEvent
@@ -1010,10 +1257,13 @@ var file_pitaya_event_proto_goTypes = []any{
 	(*SettlementEvent)(nil),    // 8: pitaya.event.SettlementEvent
 	(*EventPlayerScore)(nil),   // 9: pitaya.event.EventPlayerScore
 	(*EventFinalHand)(nil),     // 10: pitaya.event.EventFinalHand
-	(*GameEventExtension)(nil), // 11: pitaya.event.GameEventExtension
-	(RoomPhase)(0),             // 12: pitaya.common.RoomPhase
-	(RoomMode)(0),              // 13: pitaya.common.RoomMode
-	(*PlayerSeat)(nil),         // 14: pitaya.common.PlayerSeat
+	(*BoardInitEvent)(nil),     // 11: pitaya.event.BoardInitEvent
+	(*MoveCapturedCell)(nil),   // 12: pitaya.event.MoveCapturedCell
+	(*MoveEvent)(nil),          // 13: pitaya.event.MoveEvent
+	(*GameEventExtension)(nil), // 14: pitaya.event.GameEventExtension
+	(RoomPhase)(0),             // 15: pitaya.common.RoomPhase
+	(RoomMode)(0),              // 16: pitaya.common.RoomMode
+	(*PlayerSeat)(nil),         // 17: pitaya.common.PlayerSeat
 }
 var file_pitaya_event_proto_depIdxs = []int32{
 	1,  // 0: pitaya.event.GameEvent.room_state:type_name -> pitaya.event.RoomStateEvent
@@ -1024,17 +1274,20 @@ var file_pitaya_event_proto_depIdxs = []int32{
 	6,  // 5: pitaya.event.GameEvent.alert:type_name -> pitaya.event.AlertEvent
 	7,  // 6: pitaya.event.GameEvent.round_invalid:type_name -> pitaya.event.RoundInvalidEvent
 	8,  // 7: pitaya.event.GameEvent.settlement:type_name -> pitaya.event.SettlementEvent
-	12, // 8: pitaya.event.RoomStateEvent.phase:type_name -> pitaya.common.RoomPhase
-	13, // 9: pitaya.event.RoomStateEvent.room_mode:type_name -> pitaya.common.RoomMode
-	14, // 10: pitaya.event.RoomStateEvent.players:type_name -> pitaya.common.PlayerSeat
-	9,  // 11: pitaya.event.SettlementEvent.scores:type_name -> pitaya.event.EventPlayerScore
-	9,  // 12: pitaya.event.SettlementEvent.liability:type_name -> pitaya.event.EventPlayerScore
-	10, // 13: pitaya.event.SettlementEvent.final_hands:type_name -> pitaya.event.EventFinalHand
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	11, // 8: pitaya.event.GameEvent.board_init:type_name -> pitaya.event.BoardInitEvent
+	13, // 9: pitaya.event.GameEvent.move:type_name -> pitaya.event.MoveEvent
+	15, // 10: pitaya.event.RoomStateEvent.phase:type_name -> pitaya.common.RoomPhase
+	16, // 11: pitaya.event.RoomStateEvent.room_mode:type_name -> pitaya.common.RoomMode
+	17, // 12: pitaya.event.RoomStateEvent.players:type_name -> pitaya.common.PlayerSeat
+	9,  // 13: pitaya.event.SettlementEvent.scores:type_name -> pitaya.event.EventPlayerScore
+	9,  // 14: pitaya.event.SettlementEvent.liability:type_name -> pitaya.event.EventPlayerScore
+	10, // 15: pitaya.event.SettlementEvent.final_hands:type_name -> pitaya.event.EventFinalHand
+	12, // 16: pitaya.event.MoveEvent.captured:type_name -> pitaya.event.MoveCapturedCell
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_pitaya_event_proto_init() }
@@ -1052,6 +1305,8 @@ func file_pitaya_event_proto_init() {
 		(*GameEvent_Alert)(nil),
 		(*GameEvent_RoundInvalid)(nil),
 		(*GameEvent_Settlement)(nil),
+		(*GameEvent_BoardInit)(nil),
+		(*GameEvent_Move)(nil),
 	}
 	file_pitaya_event_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
@@ -1060,7 +1315,7 @@ func file_pitaya_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pitaya_event_proto_rawDesc), len(file_pitaya_event_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

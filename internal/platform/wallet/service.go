@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -73,8 +72,8 @@ func (s *Service) CreditRoomCard(ctx context.Context, userID, amount int64, reas
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO wallet_ledger (user_id, wallet_type, delta, balance_after, reason, ref_id, audit_sn)
-		 VALUES ($1, 'room_card', $2, $3, $4, $5, $6)`,
-		userID, amount, newBal, reason, refID, auditSN); err != nil {
+		 VALUES ($1, 'room_card', $2, $3, $4, $5::uuid, $6)`,
+		userID, amount, newBal, reason, nullUUID(refID), auditSN); err != nil {
 		return 0, err
 	}
 	return newBal, tx.Commit()
@@ -114,8 +113,8 @@ func (s *Service) MockRecharge(ctx context.Context, userID int64, productID stri
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO wallet_ledger (user_id, wallet_type, delta, balance_after, reason, ref_id, audit_sn)
-		 VALUES ($1, 'room_card', $2, $3, 'recharge', $4, $5)`,
-		userID, p.Cards, newBal, fmt.Sprintf("order:%d", order.ID), auditSN); err != nil {
+		 VALUES ($1, 'room_card', $2, $3, 'recharge', NULL, $4)`,
+		userID, p.Cards, newBal, auditSN); err != nil {
 		return nil, 0, err
 	}
 

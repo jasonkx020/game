@@ -1,0 +1,5 @@
+{
+  "room_card_cost": { "2": 1 },
+  "register_gift": { "game_coin": 3000, "room_card": 5 },
+  "coin_name": "冲币"
+}

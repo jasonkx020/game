@@ -26,6 +26,8 @@ export interface GameEvent {
   alert?: AlertEvent | undefined;
   roundInvalid?: RoundInvalidEvent | undefined;
   settlement?: SettlementEvent | undefined;
+  boardInit?: BoardInitEvent | undefined;
+  move?: MoveEvent | undefined;
 }
 
 export interface RoomStateEvent {
@@ -97,6 +99,26 @@ export interface EventFinalHand {
   cards: number[];
 }
 
+export interface BoardInitEvent {
+  cells: number[];
+  firstSeat: number;
+}
+
+export interface MoveCapturedCell {
+  row: number;
+  col: number;
+}
+
+export interface MoveEvent {
+  seat: number;
+  fromRow: number;
+  fromCol: number;
+  toRow: number;
+  toCol: number;
+  captured: MoveCapturedCell[];
+  nextSeat: number;
+}
+
 /** 游戏私有扩展 — 新游戏使用 game_payload bytes 或独立 proto */
 export interface GameEventExtension {
   gameId: string;
@@ -113,6 +135,8 @@ function createBaseGameEvent(): GameEvent {
     alert: undefined,
     roundInvalid: undefined,
     settlement: undefined,
+    boardInit: undefined,
+    move: undefined,
   };
 }
 
@@ -141,6 +165,12 @@ export const GameEvent: MessageFns<GameEvent> = {
     }
     if (message.settlement !== undefined) {
       SettlementEvent.encode(message.settlement, writer.uint32(66).fork()).join();
+    }
+    if (message.boardInit !== undefined) {
+      BoardInitEvent.encode(message.boardInit, writer.uint32(74).fork()).join();
+    }
+    if (message.move !== undefined) {
+      MoveEvent.encode(message.move, writer.uint32(82).fork()).join();
     }
     return writer;
   },
@@ -216,6 +246,22 @@ export const GameEvent: MessageFns<GameEvent> = {
           message.settlement = SettlementEvent.decode(reader, reader.uint32());
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.boardInit = BoardInitEvent.decode(reader, reader.uint32());
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.move = MoveEvent.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -243,6 +289,12 @@ export const GameEvent: MessageFns<GameEvent> = {
         ? RoundInvalidEvent.fromJSON(object.round_invalid)
         : undefined,
       settlement: isSet(object.settlement) ? SettlementEvent.fromJSON(object.settlement) : undefined,
+      boardInit: isSet(object.boardInit)
+        ? BoardInitEvent.fromJSON(object.boardInit)
+        : isSet(object.board_init)
+        ? BoardInitEvent.fromJSON(object.board_init)
+        : undefined,
+      move: isSet(object.move) ? MoveEvent.fromJSON(object.move) : undefined,
     };
   },
 
@@ -272,6 +324,12 @@ export const GameEvent: MessageFns<GameEvent> = {
     if (message.settlement !== undefined) {
       obj.settlement = SettlementEvent.toJSON(message.settlement);
     }
+    if (message.boardInit !== undefined) {
+      obj.boardInit = BoardInitEvent.toJSON(message.boardInit);
+    }
+    if (message.move !== undefined) {
+      obj.move = MoveEvent.toJSON(message.move);
+    }
     return obj;
   },
 
@@ -296,6 +354,10 @@ export const GameEvent: MessageFns<GameEvent> = {
     message.settlement = (object.settlement !== undefined && object.settlement !== null)
       ? SettlementEvent.fromPartial(object.settlement)
       : undefined;
+    message.boardInit = (object.boardInit !== undefined && object.boardInit !== null)
+      ? BoardInitEvent.fromPartial(object.boardInit)
+      : undefined;
+    message.move = (object.move !== undefined && object.move !== null) ? MoveEvent.fromPartial(object.move) : undefined;
     return message;
   },
 };
@@ -1448,6 +1510,352 @@ export const EventFinalHand: MessageFns<EventFinalHand> = {
     message.userId = object.userId ?? 0;
     message.seat = object.seat ?? 0;
     message.cards = object.cards?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseBoardInitEvent(): BoardInitEvent {
+  return { cells: [], firstSeat: 0 };
+}
+
+export const BoardInitEvent: MessageFns<BoardInitEvent> = {
+  encode(message: BoardInitEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    writer.uint32(10).fork();
+    for (const v of message.cells) {
+      writer.uint32(v);
+    }
+    writer.join();
+    if (message.firstSeat !== 0) {
+      writer.uint32(16).uint32(message.firstSeat);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BoardInitEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBoardInitEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag === 8) {
+            message.cells.push(reader.uint32());
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.cells.push(reader.uint32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.firstSeat = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BoardInitEvent {
+    return {
+      cells: globalThis.Array.isArray(object?.cells) ? object.cells.map((e: any) => globalThis.Number(e)) : [],
+      firstSeat: isSet(object.firstSeat)
+        ? globalThis.Number(object.firstSeat)
+        : isSet(object.first_seat)
+        ? globalThis.Number(object.first_seat)
+        : 0,
+    };
+  },
+
+  toJSON(message: BoardInitEvent): unknown {
+    const obj: any = {};
+    if (message.cells?.length) {
+      obj.cells = message.cells.map((e) => Math.round(e));
+    }
+    if (message.firstSeat !== 0) {
+      obj.firstSeat = Math.round(message.firstSeat);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BoardInitEvent>, I>>(base?: I): BoardInitEvent {
+    return BoardInitEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BoardInitEvent>, I>>(object: I): BoardInitEvent {
+    const message = createBaseBoardInitEvent();
+    message.cells = object.cells?.map((e) => e) || [];
+    message.firstSeat = object.firstSeat ?? 0;
+    return message;
+  },
+};
+
+function createBaseMoveCapturedCell(): MoveCapturedCell {
+  return { row: 0, col: 0 };
+}
+
+export const MoveCapturedCell: MessageFns<MoveCapturedCell> = {
+  encode(message: MoveCapturedCell, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.row !== 0) {
+      writer.uint32(8).uint32(message.row);
+    }
+    if (message.col !== 0) {
+      writer.uint32(16).uint32(message.col);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MoveCapturedCell {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMoveCapturedCell();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.row = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.col = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MoveCapturedCell {
+    return {
+      row: isSet(object.row) ? globalThis.Number(object.row) : 0,
+      col: isSet(object.col) ? globalThis.Number(object.col) : 0,
+    };
+  },
+
+  toJSON(message: MoveCapturedCell): unknown {
+    const obj: any = {};
+    if (message.row !== 0) {
+      obj.row = Math.round(message.row);
+    }
+    if (message.col !== 0) {
+      obj.col = Math.round(message.col);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MoveCapturedCell>, I>>(base?: I): MoveCapturedCell {
+    return MoveCapturedCell.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MoveCapturedCell>, I>>(object: I): MoveCapturedCell {
+    const message = createBaseMoveCapturedCell();
+    message.row = object.row ?? 0;
+    message.col = object.col ?? 0;
+    return message;
+  },
+};
+
+function createBaseMoveEvent(): MoveEvent {
+  return { seat: 0, fromRow: 0, fromCol: 0, toRow: 0, toCol: 0, captured: [], nextSeat: 0 };
+}
+
+export const MoveEvent: MessageFns<MoveEvent> = {
+  encode(message: MoveEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.seat !== 0) {
+      writer.uint32(8).uint32(message.seat);
+    }
+    if (message.fromRow !== 0) {
+      writer.uint32(16).uint32(message.fromRow);
+    }
+    if (message.fromCol !== 0) {
+      writer.uint32(24).uint32(message.fromCol);
+    }
+    if (message.toRow !== 0) {
+      writer.uint32(32).uint32(message.toRow);
+    }
+    if (message.toCol !== 0) {
+      writer.uint32(40).uint32(message.toCol);
+    }
+    for (const v of message.captured) {
+      MoveCapturedCell.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.nextSeat !== 0) {
+      writer.uint32(56).uint32(message.nextSeat);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MoveEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMoveEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seat = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.fromRow = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.fromCol = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.toRow = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.toCol = reader.uint32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.captured.push(MoveCapturedCell.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.nextSeat = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MoveEvent {
+    return {
+      seat: isSet(object.seat) ? globalThis.Number(object.seat) : 0,
+      fromRow: isSet(object.fromRow)
+        ? globalThis.Number(object.fromRow)
+        : isSet(object.from_row)
+        ? globalThis.Number(object.from_row)
+        : 0,
+      fromCol: isSet(object.fromCol)
+        ? globalThis.Number(object.fromCol)
+        : isSet(object.from_col)
+        ? globalThis.Number(object.from_col)
+        : 0,
+      toRow: isSet(object.toRow)
+        ? globalThis.Number(object.toRow)
+        : isSet(object.to_row)
+        ? globalThis.Number(object.to_row)
+        : 0,
+      toCol: isSet(object.toCol)
+        ? globalThis.Number(object.toCol)
+        : isSet(object.to_col)
+        ? globalThis.Number(object.to_col)
+        : 0,
+      captured: globalThis.Array.isArray(object?.captured)
+        ? object.captured.map((e: any) => MoveCapturedCell.fromJSON(e))
+        : [],
+      nextSeat: isSet(object.nextSeat)
+        ? globalThis.Number(object.nextSeat)
+        : isSet(object.next_seat)
+        ? globalThis.Number(object.next_seat)
+        : 0,
+    };
+  },
+
+  toJSON(message: MoveEvent): unknown {
+    const obj: any = {};
+    if (message.seat !== 0) {
+      obj.seat = Math.round(message.seat);
+    }
+    if (message.fromRow !== 0) {
+      obj.fromRow = Math.round(message.fromRow);
+    }
+    if (message.fromCol !== 0) {
+      obj.fromCol = Math.round(message.fromCol);
+    }
+    if (message.toRow !== 0) {
+      obj.toRow = Math.round(message.toRow);
+    }
+    if (message.toCol !== 0) {
+      obj.toCol = Math.round(message.toCol);
+    }
+    if (message.captured?.length) {
+      obj.captured = message.captured.map((e) => MoveCapturedCell.toJSON(e));
+    }
+    if (message.nextSeat !== 0) {
+      obj.nextSeat = Math.round(message.nextSeat);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MoveEvent>, I>>(base?: I): MoveEvent {
+    return MoveEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MoveEvent>, I>>(object: I): MoveEvent {
+    const message = createBaseMoveEvent();
+    message.seat = object.seat ?? 0;
+    message.fromRow = object.fromRow ?? 0;
+    message.fromCol = object.fromCol ?? 0;
+    message.toRow = object.toRow ?? 0;
+    message.toCol = object.toCol ?? 0;
+    message.captured = object.captured?.map((e) => MoveCapturedCell.fromPartial(e)) || [];
+    message.nextSeat = object.nextSeat ?? 0;
     return message;
   },
 };

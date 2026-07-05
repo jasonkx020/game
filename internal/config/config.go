@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -21,25 +23,29 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	viper.SetConfigFile(".env")
-	viper.SetConfigType("env")
-	_ = viper.ReadInConfig()
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v := viper.New()
+	v.SetConfigType("env")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	viper.SetDefault("DATABASE_URL", "postgres://game:game@localhost:5432/game?sslmode=disable")
-	viper.SetDefault("REDIS_URL", "redis://localhost:6379/0")
-	viper.SetDefault("JWT_SECRET", "dev-jwt-secret")
-	viper.SetDefault("HMAC_SECRET", "dev-hmac-secret")
-	viper.SetDefault("APP_ID", "cocos-dev")
-	viper.SetDefault("DEV_SMS_CODE", "123456")
-	viper.SetDefault("PLATFORM_HTTP_PORT", "8080")
-	viper.SetDefault("PITAYA_WS_PORT", 3250)
-	viper.SetDefault("PITAYA_WS_URL", "ws://localhost:3250")
-	viper.SetDefault("SNOWFLAKE_WORKER_ID", 1)
-	viper.SetDefault("CORS_ORIGINS", "http://localhost:5173")
+	v.SetDefault("DATABASE_URL", "postgres://game:game@localhost:5432/game?sslmode=disable")
+	v.SetDefault("REDIS_URL", "redis://localhost:6379/0")
+	v.SetDefault("JWT_SECRET", "dev-jwt-secret")
+	v.SetDefault("HMAC_SECRET", "dev-hmac-secret")
+	v.SetDefault("APP_ID", "cocos-dev")
+	v.SetDefault("DEV_SMS_CODE", "123456")
+	v.SetDefault("PLATFORM_HTTP_PORT", "8080")
+	v.SetDefault("PITAYA_WS_PORT", 3250)
+	v.SetDefault("PITAYA_WS_URL", "ws://localhost:3250")
+	v.SetDefault("SNOWFLAKE_WORKER_ID", 1)
+	v.SetDefault("CORS_ORIGINS", "http://localhost:5173")
 
-	corsRaw := viper.GetString("CORS_ORIGINS")
+	if envPath := findEnvFile(); envPath != "" {
+		v.SetConfigFile(envPath)
+		_ = v.ReadInConfig()
+	}
+
+	corsRaw := v.GetString("CORS_ORIGINS")
 	var corsOrigins []string
 	for _, o := range strings.Split(corsRaw, ",") {
 		if t := strings.TrimSpace(o); t != "" {
@@ -48,16 +54,38 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		DatabaseURL:       viper.GetString("DATABASE_URL"),
-		RedisURL:          viper.GetString("REDIS_URL"),
-		JWTSecret:         viper.GetString("JWT_SECRET"),
-		HMACSecret:        viper.GetString("HMAC_SECRET"),
-		AppID:             viper.GetString("APP_ID"),
-		DevSMSCode:        viper.GetString("DEV_SMS_CODE"),
-		PlatformHTTPPort:  viper.GetString("PLATFORM_HTTP_PORT"),
-		PitayaWSPort:      viper.GetInt("PITAYA_WS_PORT"),
-		PitayaWSURL:       viper.GetString("PITAYA_WS_URL"),
-		SnowflakeWorkerID: viper.GetInt64("SNOWFLAKE_WORKER_ID"),
+		DatabaseURL:       v.GetString("DATABASE_URL"),
+		RedisURL:          v.GetString("REDIS_URL"),
+		JWTSecret:         v.GetString("JWT_SECRET"),
+		HMACSecret:        v.GetString("HMAC_SECRET"),
+		AppID:             v.GetString("APP_ID"),
+		DevSMSCode:        v.GetString("DEV_SMS_CODE"),
+		PlatformHTTPPort:  v.GetString("PLATFORM_HTTP_PORT"),
+		PitayaWSPort:      v.GetInt("PITAYA_WS_PORT"),
+		PitayaWSURL:       v.GetString("PITAYA_WS_URL"),
+		SnowflakeWorkerID: v.GetInt64("SNOWFLAKE_WORKER_ID"),
 		CORSOrigins:       corsOrigins,
 	}, nil
+}
+
+// findEnvFile walks up from cwd to locate repo-root .env (go.mod sibling).
+func findEnvFile() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			envPath := filepath.Join(dir, ".env")
+			if _, err := os.Stat(envPath); err == nil {
+				return envPath
+			}
+			return ""
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }

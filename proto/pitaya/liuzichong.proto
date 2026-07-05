@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package pitaya.liuzichong;
+
+import "pitaya/common.proto";
+
+option go_package = "github.com/example/game/gen/pitaya/liuzichong;liuzichong";
+
+message MoveReq {
+  string room_id = 1;
+  uint32 from_row = 2;
+  uint32 from_col = 3;
+  uint32 to_row = 4;
+  uint32 to_col = 5;
+}
+
+message MoveRsp {
+  pitaya.common.EventMeta meta = 1;
+}
+
+message BoardInitPush {
+  pitaya.common.PushHeader header = 1;
+  repeated uint32 cells = 2; // row-major 4x4, 0=empty 1=black 2=white
+  uint32 first_seat = 3;
+}
+
+message CapturedCell {
+  uint32 row = 1;
+  uint32 col = 2;
+}
+
+message MoveResultPush {
+  pitaya.common.PushHeader header = 1;
+  uint32 seat = 2;
+  uint32 from_row = 3;
+  uint32 from_col = 4;
+  uint32 to_row = 5;
+  uint32 to_col = 6;
+  repeated CapturedCell captured = 7;
+  uint32 next_seat = 8;
+}

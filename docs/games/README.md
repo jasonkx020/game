@@ -51,6 +51,7 @@
 | 游戏 ID | 规则 PRD | 运营挂点 | 金币名称 |
 | :--- | :--- | :--- | :--- |
 | dawugui | [dawugui.md](../../dawugui.md) | [dawugui/ops-hooks.md](dawugui/ops-hooks.md) | 龟币 |
+| liuzichong | [liuzichong.md](../../liuzichong.md) | [liuzichong/ops-hooks.md](liuzichong/ops-hooks.md) | 冲币 |
 
 ---
 

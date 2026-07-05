@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>民间六子棋 · 六子冲（严格吃子）</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(145deg, #2b5a3a, #1d3e2a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+        }
+        .game-container {
+            background: #e8d5b5;
+            padding: 30px 40px 40px 40px;
+            border-radius: 60px 60px 40px 40px;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.6), inset 0 -4px 8px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+            font-weight: 700;
+            color: #3d2a1b;
+            letter-spacing: 4px;
+            text-shadow: 2px 2px 0 #c9ad7a;
+        }
+        canvas {
+            display: block;
+            margin: 10px auto;
+            background: #f2e3c4;
+            border-radius: 28px;
+            box-shadow: inset 0 0 0 4px #b39264, 0 10px 20px rgba(0,0,0,0.5);
+            cursor: pointer;
+            touch-action: none;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 18px 6px 0 6px;
+            background: #cbb18b;
+            padding: 12px 24px;
+            border-radius: 100px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
+        }
+        #status {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1f2e1b;
+            text-shadow: 0 1px 0 #e6d4b5;
+        }
+        #status .highlight {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            vertical-align: middle;
+            margin: -2px 8px 0 4px;
+            border: 2px solid #3d2a1b;
+        }
+        .black-dot { background: #2d2d2d; }
+        .white-dot { background: #f5f0e8; }
+        #resetBtn {
+            background: #5a3f2b;
+            border: none;
+            color: #f0e3ce;
+            font-size: 20px;
+            font-weight: 600;
+            padding: 8px 28px;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2d1f13, 0 6px 10px rgba(0,0,0,0.3);
+            transition: all 0.05s linear;
+            letter-spacing: 1px;
+        }
+        #resetBtn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #2d1f13, 0 6px 10px rgba(0,0,0,0.3);
+        }
+        #resetBtn:hover { background: #6e4f36; }
+        .footer-note {
+            margin-top: 10px;
+            color: #3d2a1b;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        .rule-note {
+            margin-top: 8px;
+            color: #5a3f2b;
+            font-size: 13px;
+            background: #dcc8a8;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <h1>♟ 六子冲</h1>
+    <canvas id="boardCanvas" width="340" height="340"></canvas>
+    <div class="info-panel">
+        <div id="status">⚫ 黑方走</div>
+        <button id="resetBtn">↻ 重开</button>
+    </div>
+    <div class="footer-note">点击己方棋子选中，再点相邻空位移动</div>
+    <div class="rule-note">吃子：形成 己-己-敌 或 敌-己-己，且两端外侧均为空（边界也算空）</div>
+</div>
+<script>
+    (function() {
+        // ---------- 常量 ----------
+        const SIZE = 4;
+        const CELL_SIZE = 80;
+        const PADDING = 50;
+        const RADIUS = 30;
+        const CANVAS_SIZE = PADDING * 2 + (SIZE - 1) * CELL_SIZE;
+
+        const canvas = document.getElementById('boardCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+
+        // ---------- 游戏状态 ----------
+        let board = [];
+        let currentPlayer = 1; // 1黑 2白
+        let selected = null;
+        let gameOver = false;
+        let winner = null;
+
+        // ---------- 初始化（黑上两排边缘，白下两排边缘，中间四空） ----------
+        function initBoard() {
+            board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+            // 黑方：第0行全满，第1行左右两端
+            for (let c = 0; c < SIZE; c++) board[0][c] = 1;
+            board[1][0] = 1;
+            board[1][3] = 1;
+            // 白方：第3行全满，第2行左右两端
+            for (let c = 0; c < SIZE; c++) board[3][c] = 2;
+            board[2][0] = 2;
+            board[2][3] = 2;
+        }
+
+        function resetGame() {
+            initBoard();
+            currentPlayer = 1;
+            selected = null;
+            gameOver = false;
+            winner = null;
+            drawBoard();
+            updateStatus();
+        }
+
+        // ---------- 绘制 ----------
+        function drawBoard() {
+            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            ctx.strokeStyle = '#5a3f2b';
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i < SIZE; i++) {
+                const x = PADDING + i * CELL_SIZE;
+                ctx.beginPath();
+                ctx.moveTo(x, PADDING);
+                ctx.lineTo(x, PADDING + (SIZE - 1) * CELL_SIZE);
+                ctx.stroke();
+                const y = PADDING + i * CELL_SIZE;
+                ctx.beginPath();
+                ctx.moveTo(PADDING, y);
+                ctx.lineTo(PADDING + (SIZE - 1) * CELL_SIZE, y);
+                ctx.stroke();
+            }
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const val = board[r][c];
+                    if (val === 0) continue;
+                    const x = PADDING + c * CELL_SIZE;
+                    const y = PADDING + r * CELL_SIZE;
+                    const isBlack = (val === 1);
+                    const isSelected = (selected && selected.row === r && selected.col === c);
+                    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 3;
+                    const gradient = ctx.createRadialGradient(x-8, y-8, 6, x, y, RADIUS+4);
+                    if (isBlack) {
+                        gradient.addColorStop(0, '#666');
+                        gradient.addColorStop(0.7, '#222');
+                        gradient.addColorStop(1, '#111');
+                    } else {
+                        gradient.addColorStop(0, '#ffffff');
+                        gradient.addColorStop(0.5, '#f0ede8');
+                        gradient.addColorStop(1, '#c0b8a8');
+                    }
+                    ctx.beginPath();
+                    ctx.arc(x, y, RADIUS, 0, Math.PI*2);
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = isBlack ? '#000' : '#8a7a6a';
+                    ctx.lineWidth = 1.8;
+                    ctx.stroke();
+                    if (isSelected) {
+                        ctx.shadowBlur = 0;
+                        ctx.strokeStyle = '#ffdd44';
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.arc(x, y, RADIUS+4, 0, Math.PI*2);
+                        ctx.stroke();
+                    }
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                }
+            }
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                ctx.font = 'bold 40px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const msg = winner === 1 ? '⚫ 黑方胜！' : (winner === 2 ? '⚪ 白方胜！' : '平局');
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur = 18;
+                ctx.fillStyle = '#fff9e6';
+                ctx.fillText(msg, CANVAS_SIZE/2, CANVAS_SIZE/2 - 10);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#2d1f13';
+                ctx.fillText(msg, CANVAS_SIZE/2 - 2, CANVAS_SIZE/2 - 12);
+            }
+        }
+
+        function updateStatus() {
+            if (gameOver) {
+                const msg = winner === 1 ? '⚫ 黑方胜利！' : (winner === 2 ? '⚪ 白方胜利！' : '平局');
+                statusDiv.innerHTML = `🏆 ${msg}`;
+                return;
+            }
+            const playerName = currentPlayer === 1 ? '黑方' : '白方';
+            const dotClass = currentPlayer === 1 ? 'black-dot' : 'white-dot';
+            statusDiv.innerHTML = `<span class="highlight ${dotClass}"></span> ${playerName} 走`;
+        }
+
+        // ---------- 吃子检测（严格：两端外侧都为空或边界） ----------
+        function checkEat(row, col, color) {
+            const enemy = 3 - color;
+            const eaten = [];
+
+            // 横向
+            for (let start = Math.max(0, col - 2); start <= Math.min(SIZE - 3, col); start++) {
+                const cells = [
+                    { row: row, col: start },
+                    { row: row, col: start + 1 },
+                    { row: row, col: start + 2 }
+                ];
+                if (!cells.some(p => p.row === row && p.col === col)) continue;
+                const vals = cells.map(p => board[p.row][p.col]);
+                // 检查是否正好两个己方和一个敌方，且己方相邻
+                const colorIndices = vals.map((v, idx) => v === color ? idx : -1).filter(i => i >= 0);
+                if (colorIndices.length !== 2) continue;
+                if (Math.abs(colorIndices[0] - colorIndices[1]) !== 1) continue;
+                let enemyIdx = -1;
+                // 必须是 己-己-敌 或 敌-己-己
+                if (colorIndices[0] === 0 && colorIndices[1] === 1 && vals[2] === enemy) enemyIdx = 2;
+                else if (colorIndices[0] === 1 && colorIndices[1] === 2 && vals[0] === enemy) enemyIdx = 0;
+                else continue;
+
+                // 检查两端外侧是否都为空（或边界）
+                // 左端外侧：start - 1
+                let leftEmpty = (start - 1 < 0) || (board[row][start - 1] === 0);
+                // 右端外侧：start + 3
+                let rightEmpty = (start + 3 >= SIZE) || (board[row][start + 3] === 0);
+                if (!leftEmpty || !rightEmpty) continue;
+
+                // 满足条件，吃掉敌方
+                const eatPos = cells[enemyIdx];
+                if (!eaten.some(p => p.row === eatPos.row && p.col === eatPos.col)) {
+                    eaten.push(eatPos);
+                }
+            }
+
+            // 纵向
+            for (let start = Math.max(0, row - 2); start <= Math.min(SIZE - 3, row); start++) {
+                const cells = [
+                    { row: start, col: col },
+                    { row: start + 1, col: col },
+                    { row: start + 2, col: col }
+                ];
+                if (!cells.some(p => p.row === row && p.col === col)) continue;
+                const vals = cells.map(p => board[p.row][p.col]);
+                const colorIndices = vals.map((v, idx) => v === color ? idx : -1).filter(i => i >= 0);
+                if (colorIndices.length !== 2) continue;
+                if (Math.abs(colorIndices[0] - colorIndices[1]) !== 1) continue;
+                let enemyIdx = -1;
+                if (colorIndices[0] === 0 && colorIndices[1] === 1 && vals[2] === enemy) enemyIdx = 2;
+                else if (colorIndices[0] === 1 && colorIndices[1] === 2 && vals[0] === enemy) enemyIdx = 0;
+                else continue;
+
+                let topEmpty = (start - 1 < 0) || (board[start - 1][col] === 0);
+                let bottomEmpty = (start + 3 >= SIZE) || (board[start + 3][col] === 0);
+                if (!topEmpty || !bottomEmpty) continue;
+
+                const eatPos = cells[enemyIdx];
+                if (!eaten.some(p => p.row === eatPos.row && p.col === eatPos.col)) {
+                    eaten.push(eatPos);
+                }
+            }
+            return eaten;
+        }
+
+        // ---------- 检查当前玩家是否有合法移动 ----------
+        function hasLegalMoves(player) {
+            const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (board[r][c] !== player) continue;
+                    for (const d of dirs) {
+                        const nr = r + d[0];
+                        const nc = c + d[1];
+                        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === 0) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // ---------- 胜负检查（只剩一颗 或 无棋可走） ----------
+        function checkWinner() {
+            let blackCount = 0, whiteCount = 0;
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (board[r][c] === 1) blackCount++;
+                    else if (board[r][c] === 2) whiteCount++;
+                }
+            }
+            if (blackCount <= 1) return 2; // 白胜
+            if (whiteCount <= 1) return 1; // 黑胜
+            if (!hasLegalMoves(currentPlayer)) {
+                return 3 - currentPlayer;
+            }
+            return null;
+        }
+
+        // ---------- 执行移动 ----------
+        function tryMove(fromRow, fromCol, toRow, toCol) {
+            if (gameOver) return false;
+            if (board[fromRow][fromCol] !== currentPlayer) return false;
+            if (board[toRow][toCol] !== 0) return false;
+            const dr = Math.abs(fromRow - toRow);
+            const dc = Math.abs(fromCol - toCol);
+            if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+                const color = currentPlayer;
+                // 移动
+                board[fromRow][fromCol] = 0;
+                board[toRow][toCol] = color;
+
+                // 吃子检测
+                const eaten = checkEat(toRow, toCol, color);
+                for (const pos of eaten) {
+                    board[pos.row][pos.col] = 0;
+                }
+
+                // 切换玩家
+                currentPlayer = 3 - currentPlayer;
+                const win = checkWinner();
+                if (win) {
+                    gameOver = true;
+                    winner = win;
+                }
+                selected = null;
+                drawBoard();
+                updateStatus();
+                if (gameOver) {
+                    const msg = winner === 1 ? '黑方胜利！' : '白方胜利！';
+                    alert(msg);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // ---------- 点击处理 ----------
+        function handleCanvasClick(e) {
+            if (gameOver) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            let minDist = Infinity;
+            let targetRow = -1, targetCol = -1;
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const x = PADDING + c * CELL_SIZE;
+                    const y = PADDING + r * CELL_SIZE;
+                    const dist = Math.hypot(mouseX - x, mouseY - y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        targetRow = r;
+                        targetCol = c;
+                    }
+                }
+            }
+            if (minDist > 45) return;
+            const row = targetRow, col = targetCol;
+            if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) return;
+
+            const val = board[row][col];
+            if (val === currentPlayer) {
+                if (selected && selected.row === row && selected.col === col) {
+                    selected = null;
+                } else {
+                    selected = { row, col };
+                }
+                drawBoard();
+                return;
+            }
+            if (val === 0 && selected) {
+                if (tryMove(selected.row, selected.col, row, col)) {
+                    // 已处理
+                } else {
+                    selected = null;
+                    drawBoard();
+                }
+                return;
+            }
+            if (selected) {
+                selected = null;
+                drawBoard();
+            }
+        }
+
+        canvas.addEventListener('click', handleCanvasClick);
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+        resetGame();
+    })();
+</script>
+</body>
+</html>

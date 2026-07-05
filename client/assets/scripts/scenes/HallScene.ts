@@ -25,12 +25,23 @@ export class HallScene extends Component {
     }
   }
 
+  async onCreateDawuguiRoom(): Promise<void> {
+    await this.createRoom('dawugui', 4)
+  }
+
+  async onCreateLiuzichongRoom(): Promise<void> {
+    await this.createRoom('liuzichong', 2)
+  }
+
+  /** @deprecated 兼容旧按钮绑定 */
   async onQuickCreateRoom(): Promise<void> {
+    await this.onCreateDawuguiRoom()
+  }
+
+  private async createRoom(gameId: string, playerCount: number): Promise<void> {
     try {
-      SessionStore.room = await SessionStore.api.createRoom({
-        gameId: 'dawugui',
-        playerCount: 4,
-      })
+      SessionStore.resetRoom()
+      SessionStore.room = await SessionStore.api.createRoom({ gameId, playerCount })
       director.loadScene('Room')
     } catch (e) {
       console.error('[Hall] create room failed', e)

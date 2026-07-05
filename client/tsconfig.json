@@ -1,17 +1,13 @@
 {
+  /* Base configuration. Do not edit this field. */
+  "extends": "./temp/tsconfig.cocos.json",
+
+  /* Add your custom configuration here. */
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "lib": ["ES2020", "DOM"],
-    "types": ["node"],
-    "baseUrl": ".",
+    "strict": false,
     "paths": {
-      "platform/*": ["assets/platform/*"]
+      "platform/*": ["./assets/platform/*"],
+      "@bufbuild/protobuf/wire": ["./node_modules/@bufbuild/protobuf/dist/esm/wire/index"]
     }
-  },
-  "include": ["assets/**/*.ts", "tests/**/*.ts"]
+  }
 }

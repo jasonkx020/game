@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	pitaya "github.com/topfreegames/pitaya/v2"
 	"github.com/topfreegames/pitaya/v2/component"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +17,7 @@ import (
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
 	"github.com/example/game/internal/pitaya/commit"
+	"github.com/example/game/internal/pitaya/roommeta"
 	"github.com/example/game/internal/pitaya/runtime"
 )
 
@@ -25,10 +27,14 @@ type Handler struct {
 	committer *commit.Committer
 	audit     *audit.Generator
 	actionLog *actionlog.Repo
+	roomMeta  *roommeta.Repo
 }
 
-func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo) *Handler {
-	return &Handler{store: store, committer: committer, audit: gen, actionLog: log}
+func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, db *sqlx.DB) *Handler {
+	return &Handler{
+		store: store, committer: committer, audit: gen, actionLog: log,
+		roomMeta: roommeta.NewRepo(db),
+	}
 }
 
 func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error) {
@@ -42,12 +48,30 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	if err != nil {
 		return nil, err
 	}
-	room := h.store.GetOrCreate(roomID, "dawugui", 4)
+
+	meta, err := h.roomMeta.Get(ctx, roomID)
+	if err != nil {
+		return nil, pitaya.Error(nil, "ROOM")
+	}
+	eng, err := game.Get(meta.GameID)
+	if err != nil {
+		return nil, err
+	}
+	gameMeta := eng.Meta()
+
+	room := h.store.GetOrCreate(roomID, meta.GameID, meta.PlayerCount)
 	room.Lock()
 	defer room.Unlock()
+
 	if _, ok := room.Seats[userID]; !ok {
-		seat := uint32(len(room.Seats))
-		room.Seats[userID] = &runtime.Seat{UserID: userID, Seat: seat, Nickname: "p" + uid, Online: true}
+		if room.PlayerCount() >= gameMeta.MaxPlayers {
+			return nil, pitaya.Error(nil, "SEAT_FULL")
+		}
+		seat := uint32(room.PlayerCount())
+		room.Seats[userID] = &runtime.Seat{
+			UserID: userID, Seat: seat, Nickname: "p" + uid, Online: true,
+			Role: runtime.SeatRolePlayer,
+		}
 		room.RoomSeq++
 		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN", int64(userID), h.audit.Next(), []byte("{}"))
 	}
@@ -75,14 +99,15 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 	if seat, ok := room.Seats[userID]; ok {
 		seat.Ready = true
 	}
-	if !room.AllReady() {
-		return &pb.ReadyRsp{}, nil
-	}
 
 	eng, err := game.Get(room.GameID)
 	if err != nil {
 		return nil, err
 	}
+	if !room.AllReady(eng.Meta().MinPlayers) {
+		return &pb.ReadyRsp{}, nil
+	}
+
 	room.RoundNo++
 	cfgBytes, _ := json.Marshal(map[string]interface{}{"base_score": 1})
 	round, err := h.actionLog.CreateRound(ctx, roomID, room.RoundNo, room.GameID, cfgBytes)

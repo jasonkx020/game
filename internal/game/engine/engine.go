@@ -6,10 +6,12 @@ type EventType string
 
 const (
 	EventRoomState    EventType = "ROOM_STATE"
+	EventBoardInit    EventType = "BOARD_INIT"
 	EventDeal         EventType = "DEAL"
 	EventTurn         EventType = "TURN"
 	EventPlay         EventType = "PLAY"
 	EventPass         EventType = "PASS"
+	EventMove         EventType = "MOVE"
 	EventAlert        EventType = "ALERT"
 	EventRoundInvalid EventType = "ROUND_INVALID"
 	EventSettlement   EventType = "SETTLEMENT"
@@ -40,12 +42,15 @@ type ActionKind int
 const (
 	ActionPlay ActionKind = iota + 1
 	ActionPass
+	ActionMove
 )
 
 type Action struct {
 	Kind   ActionKind
 	Seat   uint32
 	Cards  []uint32
+	FromRow, FromCol int
+	ToRow, ToCol     int
 }
 
 type RoundEnd struct {
