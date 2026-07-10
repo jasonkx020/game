@@ -1,4 +1,4 @@
-.PHONY: up down migrate migrate-down migrate-docker seed-dev gen-proto test run-api run-game run-admin tidy build-linux docker-build docker-up-prod serve-bundles
+.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto test run-api run-game run-admin tidy build-linux docker-build docker-up-prod serve-bundles
 
 GOOS_LINUX ?= linux
 GOARCH ?= amd64
@@ -14,19 +14,22 @@ up:
 down:
 	$(COMPOSE) down
 
-# 本地已安装 migrate CLI 时使用（Linux/macOS 常见）
+# 本地 / CI：仅需 Go，读取 .env DATABASE_URL
 migrate:
-	migrate -path migrations -database "$(DATABASE_URL)" up
+	go run ./cmd/migrate up
+
+migrate-status:
+	go run ./cmd/migrate status
 
 migrate-down:
-	migrate -path migrations -database "$(DATABASE_URL)" down 1
+	go run ./cmd/migrate down $(or $(STEPS),1)
 
-# 无需本地 migrate，适合 Windows / CI
+# 可选：Docker 内执行（生产 compose 仍用 migrate/migrate 镜像）
 migrate-docker:
 	docker run --rm -v "$(CURDIR)/migrations:/migrations" migrate/migrate \
 		-path=/migrations -database "$(MIGRATE_DB)" up
 
-seed-dev: migrate-docker
+seed-dev: migrate
 
 run-admin:
 	cd web/admin && npm run dev

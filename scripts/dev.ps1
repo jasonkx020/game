@@ -12,11 +12,12 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet(
-        'help', 'up', 'down', 'migrate', 'migrate-down', 'seed-dev',
+        'help', 'up', 'down', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
         'run-api', 'run-game', 'run-admin', 'test', 'tidy',
         'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build', 'serve-bundles'
     )]
-    [string]$Command = 'help'
+    [string]$Command = 'help',
+    [int]$Steps = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,18 +44,24 @@ function Get-MigrateDatabaseUrl {
     if (-not $url) {
         $url = 'postgres://game:game@localhost:5432/game?sslmode=disable'
     }
-    # migrate 在 Docker 容器内运行，Windows/macOS 需用 host.docker.internal
-    if ($url -match '@localhost:' -or $url -match '@127\.0\.0\.1:') {
-        $url = $url -replace '@localhost:', '@host.docker.internal:'
-        $url = $url -replace '@127\.0\.0\.1:', '@host.docker.internal:'
-    }
     return $url
 }
 
 function Invoke-Migrate {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$MigrateArgs)
+    Import-DotEnv
+    $env:MIGRATE_DATABASE_URL = Get-MigrateDatabaseUrl
+    go run ./cmd/migrate @MigrateArgs
+}
+
+function Invoke-MigrateDocker {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$MigrateArgs)
     $db = Get-MigrateDatabaseUrl
-    Write-Host "migrate database: $db"
+    if ($db -match '@localhost:' -or $db -match '@127\.0\.0\.1:') {
+        $db = $db -replace '@localhost:', '@host.docker.internal:'
+        $db = $db -replace '@127\.0\.0\.1:', '@host.docker.internal:'
+    }
+    Write-Host "migrate database (docker): $db"
     docker run --rm `
         -v "${Root}/migrations:/migrations" `
         migrate/migrate `
@@ -69,9 +76,11 @@ Windows 开发命令（在仓库根目录执行）:
 
   .\scripts\dev.ps1 up              启动 Postgres + Redis (Docker)
   .\scripts\dev.ps1 down            停止基础设施
-  .\scripts\dev.ps1 seed-dev        数据库迁移 + 种子数据
-  .\scripts\dev.ps1 migrate         同上（migrate up）
-  .\scripts\dev.ps1 migrate-down    回滚一步迁移
+  .\scripts\dev.ps1 migrate-status   查看迁移状态（当前/最新/待执行）
+  .\scripts\dev.ps1 migrate         升级到最新版本
+  .\scripts\dev.ps1 migrate-down    回滚一步（-Steps 2 回滚两步）
+  .\scripts\dev.ps1 seed-dev        同 migrate（升级 + 种子已在迁移中）
+  .\scripts\dev.ps1 migrate-docker  在 Docker 内执行（可选，需 Docker）
   .\scripts\dev.ps1 run-api         启动 platform-api (:8080)
   .\scripts\dev.ps1 run-game        启动 Pitaya game (:3250)
   .\scripts\dev.ps1 run-admin       启动运营后台 (:5173)
@@ -99,8 +108,10 @@ switch ($Command) {
         docker compose -f deploy/docker-compose.yml down
     }
     'migrate' { Invoke-Migrate 'up' }
+    'migrate-status' { Invoke-Migrate 'status' }
     'seed-dev' { Invoke-Migrate 'up' }
-    'migrate-down' { Invoke-Migrate 'down', '1' }
+    'migrate-down' { Invoke-Migrate 'down', "$Steps" }
+    'migrate-docker' { Invoke-MigrateDocker 'up' }
     'run-api' {
         go run ./cmd/platform-api
     }

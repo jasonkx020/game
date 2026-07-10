@@ -7,11 +7,10 @@ Go 双进程：**Gin platform-api** + **Pitaya game**；P1 运营后台 + **Coco
 
 ## 前置
 
-- Go 1.22+
+- Go 1.22+（含数据库迁移：`go run ./cmd/migrate`，无需单独安装 migrate CLI）
 - Node.js 18+（运营后台、客户端 Vitest）
 - Cocos Creator 3.8.8（运行游戏客户端场景）
-- Docker Desktop（Postgres + Redis；Windows 上 migrate 也走 Docker）
-- [migrate CLI](https://github.com/golang-migrate/migrate)（可选；Windows 推荐用 `scripts/dev.ps1 migrate`）
+- Docker Desktop（可选：本地 Postgres + Redis；`dev.ps1 up`）
 
 ## Windows 快速启动
 
@@ -22,7 +21,7 @@ Copy-Item .env.example .env
 # 2. 基础设施
 .\scripts\dev.ps1 up
 
-# 3. 数据库迁移 + 种子（无需安装 migrate CLI）
+# 3. 数据库迁移 + 种子（使用 .env 中的 DATABASE_URL）
 .\scripts\dev.ps1 seed-dev
 
 # 4. 生成 proto（需 buf）
@@ -47,13 +46,24 @@ cd web/admin; npm install; cd ../..
 ```bash
 cp .env.example .env
 make up
-make seed-dev          # 使用 migrate-docker，无需本地 migrate
+make seed-dev          # go run ./cmd/migrate up
 make gen-proto
 make run-api           # 终端 1
 make run-game          # 终端 2
 ```
 
-若已安装 `migrate` CLI，可将 Makefile 中 `seed-dev` 改为依赖 `migrate` 目标。
+Linux/macOS 与 Windows 使用同一迁移入口：`go run ./cmd/migrate`。
+
+### 数据库迁移
+
+| 命令 | Windows | Linux/macOS |
+|------|---------|-------------|
+| 查看状态 | `.\scripts\dev.ps1 migrate-status` | `make migrate-status` |
+| 升级到最新 | `.\scripts\dev.ps1 migrate` | `make migrate` |
+| 回滚 1 步 | `.\scripts\dev.ps1 migrate-down` | `make migrate-down` |
+| 回滚 N 步 | `.\scripts\dev.ps1 migrate-down -Steps 2` | `make migrate-down STEPS=2` |
+
+或直接：`go run ./cmd/migrate status|up|down [N]`
 
 ## 生产构建（Linux）
 
