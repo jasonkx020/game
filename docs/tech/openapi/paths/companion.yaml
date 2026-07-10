@@ -1,0 +1,179 @@
+/v1/companion/sessions:
+  post:
+    tags:
+      - Companion
+    summary: 创建伴侣会话
+    operationId: createCompanionSession
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              persona_id:
+                type: string
+                example: default
+    responses:
+      '201':
+        description: 已创建
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/companion/sessions/{session_id}/messages:
+  get:
+    tags:
+      - Companion
+    summary: 会话消息历史
+    operationId: listCompanionMessages
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 成功
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+/v1/companion/sessions/{session_id}/chat:
+  post:
+    tags:
+      - Companion
+    summary: 伴侣对话（SSE）
+    operationId: companionChat
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+    responses:
+      '200':
+        description: text/event-stream
+        content:
+          text/event-stream:
+            schema:
+              type: string
+
+/v1/companion/personas:
+  get:
+    tags:
+      - Companion
+    summary: 可用人设列表
+    operationId: listCompanionPersonas
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+
+/v1/lobby/recommendations:
+  get:
+    tags:
+      - Lobby
+    summary: 大厅游戏推荐
+    operationId: listLobbyRecommendations
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+
+/v1/user/settings:
+  get:
+    tags:
+      - User
+    summary: 用户设置（含伴侣偏好）
+    operationId: getUserSettings
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+  put:
+    tags:
+      - User
+    summary: 更新用户设置
+    operationId: putUserSettings
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              settings:
+                type: object
+    responses:
+      '200':
+        description: 成功

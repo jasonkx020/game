@@ -1,0 +1,10 @@
+{
+  "name": "games-lobby",
+  "version": "1.0.0",
+  "private": true,
+  "description": "独立游戏大厅 App（从 GameS 迁出壳层）",
+  "scripts": {
+    "sync-sdk": "node scripts/sync-platform-sdk.js",
+    "note": "使用 Cocos Creator 3.8.8 打开 client/ 目录构建"
+  }
+}

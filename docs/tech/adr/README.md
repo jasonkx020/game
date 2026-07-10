@@ -19,6 +19,9 @@
 | 002 | [002-pluggable-game-constraints.md](002-pluggable-game-constraints.md) | Accepted | 平台/游戏解耦、增游戏白名单、proto route 规范 |
 | 004 | [004-pitaya-game-framework.md](004-pitaya-game-framework.md) | Accepted | Pitaya Handler/Groups/Engine 分工与路由表 |
 | 005 | [005-ordered-action-log-replay.md](005-ordered-action-log-replay.md) | Accepted | 有序动作日志、action_seq、玩家回放 |
+| 006 | [006-game-lobby-dynamic-bundle.md](006-game-lobby-dynamic-bundle.md) | Accepted | 游戏大厅 API 驱动、Remote Bundle、用户偏好 |
+| 007 | [007-companion-llm.md](007-companion-llm.md) | Accepted | 智能伴侣 LLM、Tool Calling、SSE |
+| 008 | [008-game-host-sdk.md](008-game-host-sdk.md) | Accepted | 独立发布与 GameHostSDK 双入口 |
 
 **已 superseded（未单独成文）：** 自研 WS Gateway + RoomActor + Envelope 主帧方案（见 [proto/DEPRECATED.md](../proto/DEPRECATED.md)）。
 

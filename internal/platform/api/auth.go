@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/example/game/internal/platform/user"
 )
 
 func (s *Server) login(c *gin.Context) {
@@ -53,5 +55,12 @@ func (s *Server) profile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found", "request_id": c.GetString("request_id")})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user_id": u.ID, "phone": u.Phone, "nickname": u.Nickname, "role": u.Role})
+	c.JSON(http.StatusOK, gin.H{
+		"user_id":      u.ID,
+		"phone":        u.Phone,
+		"phone_masked": user.MaskPhone(u.Phone),
+		"nickname":     u.Nickname,
+		"role":         u.Role,
+		"avatar_url":   u.AvatarURL,
+	})
 }

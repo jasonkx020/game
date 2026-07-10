@@ -32,21 +32,31 @@ npm test
    cd client && npm install
    ```
 2. 用 Cocos Creator 打开 **`client/`** 目录（Import Map 已写入 `settings/v2/packages/project.json`，指向 `import-map.json`；若仍报模块找不到，请重启编辑器）
-3. 创建场景并命名：`Launch`、`Hall`、`Room`、**`Liuzichong`**（六子冲棋盘）
+3. 创建场景并命名：`Launch`、`Lobby`（或 `Hall` 兼容）、`Room`、**`Liuzichong`**（六子冲棋盘）
 4. 挂载脚本（`assets/scripts/scenes/` 与 `assets/games/liuzichong/`）：
    - **Launch**：`LaunchScene` + 两个 EditBox（手机号/验证码）+ 登录按钮 → `onLoginClick`
-   - **Hall**：`HallScene` + Label（用户/房卡）+ 按钮 → `onCreateDawuguiRoom` / `onCreateLiuzichongRoom`
+   - **Lobby**：`LobbyScene` + Label（用户/房卡/状态）+ 可选 `gameListRoot` 节点（动态游戏列表）
    - **Room**：`RoomScene` + Label（Push 日志）；打乌龟可保留 `onPassClick` / `onPlayClick`
    - **Liuzichong**：`LiuzichongScene` 或 `LiuzichongBoard` + 可选 Label（`statusLabel` / `overlayLabel`）+ 返回按钮 → `onBackToHall`
 5. Build Settings 将 **Launch** 设为起始场景
+
+## 游戏 Bundle（按需下载）
+
+1. 在 Cocos 编辑器将 `assets/games/{gameId}/` 配置为 **Remote Bundle**
+2. 构建产物输出到 `client/build/bundles/{gameId}/`
+3. 启动本地静态服务：`make serve-bundles` 或 `.\scripts\dev.ps1 serve-bundles`（:8787）
+4. 数据库 `game_client_bundle.bundle_url` 指向上述地址（migration 000009 已种子 dev URL）
+
+开发时若 Bundle 未构建，`GameBundleManager` 会回退加载内置模块。
 
 ## 联调流程
 
 1. `make up && make seed-dev`
 2. `make run-api`（:8080）与 `make run-game`（:3250 WS）
-3. Cocos 运行 Launch 场景
-4. 默认 dev 登录：`13800000001` / `123456`
-5. Hall → 选游戏开房 → Room 进房后：
+3. 可选：`make serve-bundles`（:8787）
+4. Cocos 运行 Launch 场景
+5. 默认 dev 登录：`13800000001` / `123456`
+6. Lobby → 选游戏开房 → Room 进房后：
    - **打乌龟**：留在 Room，看 Push 日志
    - **六子冲**：自动进入 Liuzichong 场景，2 人 ready 后可走子
 

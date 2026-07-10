@@ -5,5 +5,9 @@
   "uuid": "894823d0-27d1-4341-b3af-2e5623d4475b",
   "files": [],
   "subMetas": {},
-  "userData": {}
+  "userData": {
+    "isBundle": true,
+    "bundleName": "dawugui",
+    "priority": 8
+  }
 }

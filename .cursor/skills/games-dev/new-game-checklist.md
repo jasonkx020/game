@@ -1,6 +1,6 @@
 # 新游戏技术接入清单
 
-基于 [docs/game/README.md](../../docs/game/README.md) 与 [ADR-002](../../docs/tech/adr/002-pluggable-game-constraints.md)。
+基于 [docs/games/README.md](../../docs/games/README.md) 与 [ADR-002](../../docs/tech/adr/002-pluggable-game-constraints.md)、[ADR-006](../../docs/tech/adr/006-game-lobby-dynamic-bundle.md)。
 
 参考实现：
 - **dawugui**（打乌龟）— 完整范例：3~5 人扑克、playcards/pass
@@ -8,11 +8,11 @@
 
 ---
 
-## 文档层（与 game-ops 协作）
+## 文档层（与 games-ops 协作）
 
 ```
 - [ ] 编写规则 PRD：{gameId}.md（参考 dawugui.md）
-- [ ] 填写运营挂点：docs/game/{gameId}/ops-hooks.md（§3 游戏金币经济必填）
+- [ ] 填写运营挂点：docs/games/{gameId}/ops-hooks.md（§3 游戏金币经济必填）
 - [ ] 在 运营手册.md 游戏层表格注册
 - [ ] 同步 JSON 配置：config/ops-hooks/{gameId}.json
 ```
@@ -38,6 +38,14 @@
 - [ ] Push 含 audit_sn + action_seq
 ```
 
+## 后端 — 大厅与 Bundle
+
+```
+- [ ] game_catalog 种子（migration 或 SQL）
+- [ ] game_client_bundle 种子（bundle_url、entry_scene、version）
+- [ ] 确认 GET /v1/lobby/games 返回新游戏
+```
+
 ## Proto
 
 ```
@@ -51,10 +59,12 @@
 ## 客户端（Cocos）
 
 ```
-- [ ] client/assets/game/{gameId}/ — Scene 或 Board 组件
+- [ ] client/assets/games/{gameId}/ — Scene 或 Board 组件
 - [ ] {GameId}PushHandler.ts — 映射 Push → UI 事件
-- [ ] HallScene 添加入口按钮（onCreate{GameId}Room）
-- [ ] 如需独立场景：Cocos 编辑器创建场景并挂载脚本
+- [ ] {GameId}Module.ts — 注册 GameModuleRegistry（registerPush/entryScene/onPassClick 等）
+- [ ] GameEntry.ts — Bundle 入口
+- [ ] Cocos 编辑器：games/{id}/ 配置为 Remote Bundle
+- [ ] GameBundleManager.loadBuiltinModule 添加 fallback case（开发用）
 - [ ] cd client && npm test 通过
 ```
 
@@ -68,15 +78,16 @@
 | `openapi/components/` 公共 schema | 除游戏 config 字段外 |
 | `internal/pitaya/handlers/connector` | 除非平台级变更 |
 | `internal/pitaya/handlers/room` | 除非房间流程变更 |
+| `LobbyScene.ts` 硬编码游戏按钮 | 列表由 API 驱动 |
 
-游戏目录与配置通过 `GET /v1/game/{id}/config` 读取 ops-hooks，无需改 wallet。
+游戏目录与配置通过 `GET /v1/lobby/games` 与 `GET /v1/games/{id}/config` 读取。
 
 ## 验证
 
 ```
 - [ ] go test ./...
 - [ ] make gen-proto && make gen-client-proto 无报错
-- [ ] P0 流程：login → 开房 → WS entry/bind/join/ready → 游戏操作
+- [ ] P0 流程：login → Lobby 可见新游戏 → 开房 → WS entry/bind/join/ready → 游戏操作
 - [ ] Push 日志含连续 action_seq
 - [ ] 多客户端联调（Cocos 或手动 WS）
 ```
@@ -86,9 +97,9 @@
 | 层 | 路径 | dawugui 范例 | liuzichong 范例 |
 | :--- | :--- | :--- | :--- |
 | 规则 PRD | `{gameId}.md` | dawugui.md | liuzichong.md |
-| 运营挂点 | docs/game/{id}/ops-hooks.md | dawugui/ | liuzichong/ |
+| 运营挂点 | docs/games/{id}/ops-hooks.md | dawugui/ | liuzichong/ |
 | Engine | internal/game/{id}/ | dawugui/ | liuzichong/ |
 | Handler | internal/pitaya/handlers/{id}/ | dawugui/ | liuzichong/ |
 | Proto | proto/pitaya/{id}.proto | dawugui.proto | liuzichong.proto |
-| 客户端 | client/assets/game/{id}/ | DawuguiPushHandler.ts | LiuzichongScene.ts 等 |
-| 配置 | config/ops-hooks/{id}.json | dawugui.json | — |
+| 客户端 Module | client/assets/games/{id}/ | DawuguiModule.ts | LiuzichongModule.ts |
+| Bundle 配置 | game_client_bundle 表 | dawugui | liuzichong |

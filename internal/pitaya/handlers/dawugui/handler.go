@@ -14,6 +14,7 @@ import (
 	"github.com/example/game/internal/game"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
+	"github.com/example/game/internal/pitaya/bot"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/runtime"
 )
@@ -88,6 +89,8 @@ func (h *Handler) apply(ctx context.Context, roomIDStr string, action engine.Act
 		for _, seat := range room.Seats {
 			seat.Ready = false
 		}
+	} else {
+		_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
 	}
 
 	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.audit.Next()}
@@ -124,6 +127,7 @@ func (h *Handler) applyPass(ctx context.Context, roomIDStr string) (*pb.PlayCard
 	if err := h.committer.CommitEvents(ctx, room, events, "game.dawugui.pass"); err != nil {
 		return nil, err
 	}
+	_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
 	return &pb.PlayCardsRsp{}, nil
 }
 

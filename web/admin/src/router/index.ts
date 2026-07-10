@@ -16,6 +16,7 @@ const router = createRouter({
         { path: 'clubs/:id', component: () => import('@/views/ClubDetail.vue') },
         { path: 'recharge', component: () => import('@/views/Recharge.vue') },
         { path: 'games', component: () => import('@/views/GameConfig.vue') },
+        { path: 'companion', component: () => import('@/views/CompanionPersonas.vue') },
       ],
     },
   ],

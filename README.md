@@ -37,6 +37,9 @@ Copy-Item .env.example .env
 # 6. 运营后台（可选）
 cd web/admin; npm install; cd ../..
 .\scripts\dev.ps1 run-admin  # :5173
+
+# 7. 游戏 Bundle 静态服务（可选，按需下载）
+.\scripts\dev.ps1 serve-bundles  # :8787
 ```
 
 ## Linux / macOS 快速启动
@@ -71,7 +74,9 @@ make docker-up-prod    # 参考 deploy/docker-compose.prod.yml
 |----|------|
 | 工程 | [client/](client/)（Cocos Creator 3.8.8） |
 | SDK | ApiClient + PitayaClient + GameSession |
-| 场景 | Launch → Hall → Room（脚本已提供，需在编辑器挂载 UI） |
+| 场景 | Launch → **Lobby** → Room（脚本已提供，需在编辑器挂载 UI） |
+| 大厅 | API 驱动游戏列表，`GET /v1/lobby/games`；支持隐藏/置顶 |
+| Bundle | `make serve-bundles` 本地托管；未构建时自动回退内置模块 |
 | 单测 | `make test-client` 或 `cd client && npm test` |
 
 ## 运营后台（P1）
@@ -95,6 +100,7 @@ Admin Web 与 Cocos 客户端共用同一 `platform-api`，请求需 HMAC 签名
 
 - 俱乐部：`/v1/clubs/*`（成员、房卡池划拨）
 - 游戏目录：`GET /v1/games`、`GET /v1/games/{id}/config`
+- 游戏大厅：`GET /v1/lobby/games`、`PUT /v1/lobby/games`（用户偏好）
 - Mock 充值：`POST /v1/wallet/room-card/recharge`（`rc_10` / `rc_50` / `rc_200`）
 - 运营报表：`GET /v1/admin/metrics/overview`、`/v1/admin/metrics/room-cards`（需 `platform_admin` 或 `club_admin` 角色）
 

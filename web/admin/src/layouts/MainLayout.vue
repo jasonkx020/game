@@ -7,6 +7,7 @@
         <el-menu-item index="/clubs">俱乐部</el-menu-item>
         <el-menu-item index="/recharge">Mock 充值</el-menu-item>
         <el-menu-item index="/games">游戏配置</el-menu-item>
+        <el-menu-item index="/companion">伴侣人设</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

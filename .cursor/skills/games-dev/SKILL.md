@@ -1,11 +1,9 @@
 ---
-name: game-dev
-description: Guides Go/Pitaya/Cocos development for the game platform: dual-process architecture, GameEngine constraints, proto generation, local dev, and new-game onboarding. Use when modifying backend, client, admin, proto, migrations, or adding a new game in this repository.
+name: games-dev
+description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-process architecture, GameEngine constraints, proto generation, local dev, lobby, dynamic bundles, and new-game onboarding. Use when modifying backend, client, admin, proto, migrations, or adding a new game in this repository.
 ---
 
-# game 技术开发
-
-打乌龟游戏平台（game）全栈开发约定。详细架构见 [docs/tech/README.md](../../docs/tech/README.md)。
+# GameS 技术开发
 
 ## 项目速览
 
@@ -19,6 +17,15 @@ description: Guides Go/Pitaya/Cocos development for the game platform: dual-proc
 技术栈：Go 1.22+ / Gin + OpenAPI / Pitaya v2 Standalone / PostgreSQL + Redis / Cocos Creator 3 + Vue 3。
 
 本地启动见 [README.md](../../README.md)。
+
+## 游戏大厅与动态 Bundle
+
+- 大厅 API：`GET/PUT /v1/lobby/games`、`GET /v1/lobby/recommendations`
+- **智能伴侣**：`POST /v1/companion/sessions`、`POST .../chat`（SSE）、`internal/platform/companion/`
+- 客户端：`platform/companion/`（CompanionPanel）、`platform/lobby/GameShelf`、`platform/host/GameHost`
+- 新游戏：实现 `{GameId}Module.ts` + Remote Bundle + 可选 `companionHooks`
+- 本地 Bundle 服务：`make serve-bundles`（:8787）
+- ADR：[006](../../docs/tech/adr/006-game-lobby-dynamic-bundle.md) [007](../../docs/tech/adr/007-companion-llm.md) [008](../../docs/tech/adr/008-game-host-sdk.md)
 
 ## 架构硬约束
 
@@ -101,7 +108,10 @@ docs/tech/            技术文档与 ADR
 → `internal/game/{id}/` Engine → `internal/pitaya/handlers/{id}/` Handler → `proto/pitaya/{id}.proto` → `make gen-proto` + `make gen-client-proto`
 
 **改客户端联调**
-→ `client/assets/platform/sdk/`（ApiClient/PitayaClient/gameession）→ `client/assets/game/{id}/`（PushHandler/Scene）
+→ `client/assets/platform/sdk/`（ApiClient/PitayaClient/GameSession）→ `client/assets/platform/lobby/` → `client/assets/games/{id}/`（Module/PushHandler/Bundle）
+
+**改游戏大厅或用户偏好**
+→ `internal/platform/lobby/` + `migrations/` + `LobbyScene.ts` + OpenAPI `lobby.yaml`
 
 **改运营后台**
 → `web/admin/src/`；API 契约见 `docs/tech/openapi/openapi.yaml`

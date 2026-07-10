@@ -37,7 +37,7 @@ export class LiuzichongBoard extends Component {
 
   start(): void {
     if (!SessionStore.session || !SessionStore.room || SessionStore.room.gameId !== 'liuzichong') {
-      director.loadScene('Hall')
+      director.loadScene('Lobby')
       return
     }
     this.buildBoardNodes()
@@ -270,6 +270,6 @@ export class LiuzichongBoard extends Component {
     SessionStore.session?.leave()
     SessionStore.session = null
     liuzichongState.reset()
-    director.loadScene('Hall')
+    director.loadScene('Lobby')
   }
 }

@@ -19,9 +19,14 @@
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: '../components/schemas.yaml#/GameMeta'
+              type: object
+              required:
+                - games
+              properties:
+                games:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/GameMeta'
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
 

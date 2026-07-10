@@ -21,7 +21,7 @@
 flowchart TB
     subgraph cocos [Cocos Creator 3]
         Launch[Launch]
-        Hall[Hall]
+        Lobby[Lobby]
         RoomUI[Room UI]
         GameDawugui[dawugui Scene]
         subgraph sdk [Platform SDK]
@@ -31,9 +31,9 @@ flowchart TB
             Auth[Auth]
         end
     end
-    Launch --> Hall
-    Hall --> RoomUI
-    Hall --> ReplayPlayer
+    Launch --> Lobby
+    Lobby --> RoomUI
+    Lobby --> ReplayPlayer
     RoomUI --> GameDawugui
     ApiClient --> Launch
     PitayaClient --> RoomUI
@@ -47,6 +47,24 @@ flowchart TB
 | `ReplayPlayer` | HTTP 拉 replay、按 seq 驱动 UI |
 | `EventTracker` | 维护 lastActionSeq、gap 检测 |
 | `games/dawugui/` | 牌桌 UI、Push 驱动动画 |
+| `platform/companion/` | **智能伴侣**：CompanionPanel、SSE 对话、局内提示 |
+| `platform/host/GameHost` | 大厅 / 独立 App 双入口启动 |
+
+---
+
+## 2.1 智能伴侣大厅（ADR-007）
+
+| 模块 | 职责 |
+| :--- | :--- |
+| `CompanionPanel` | 大厅陪聊主区（占屏 60%+），快捷指令 |
+| `CompanionClient` | SSE 流式对话、会话管理 |
+| `GameShelf` | 游戏架：推荐 + 下载 + 一键进入 |
+| `GameHost` | `mode: lobby \| standalone` 启动游戏 |
+| `CompanionSidebar` | 局内侧栏陪玩提示（`companionHooks`） |
+
+场景流：`Launch → Lobby（陪聊+游戏架）→ Room → GameScene`
+
+详见 [adr/007-companion-llm.md](adr/007-companion-llm.md)、[game-host-sdk.md](game-host-sdk.md)。
 
 ---
 
@@ -97,14 +115,26 @@ flowchart LR
 ## 6. 场景流转
 
 ```
-Launch → Hall → [HTTP 开房] → Room → [Pitaya join/ready] → GameScene
+Launch → Lobby → [HTTP 开房] → Room → [Pitaya join/ready] → GameScene（可选）
 ```
 
 | 场景 | 协议 |
 | :--- | :--- |
 | 登录 | HTTP |
+| 大厅列表 | HTTP `GET /v1/lobby/games` |
 | 开房 | HTTP |
 | 对局 | Pitaya Request + Push |
+
+### 游戏大厅（Lobby）
+
+- 场景：`LobbyScene`（`HallScene` 为兼容别名）
+- 模块：`platform/lobby/` — `GameModuleRegistry`、`GameBundleManager`
+- 列表由 API 驱动；用户可隐藏/置顶/排序（`PUT /v1/lobby/games`）
+- 进入游戏前 `GameBundleManager.ensureLoaded()` 按需下载 Remote Bundle
+- 开发兜底：Bundle 下载失败时动态 `import()` 内置模块
+- 本地 Bundle 服务：`make serve-bundles`（:8787）
+
+详见 [adr/006-game-lobby-dynamic-bundle.md](adr/006-game-lobby-dynamic-bundle.md)。
 
 ---
 
@@ -130,11 +160,13 @@ client/assets/platform/
 │   ├── PitayaPacket.ts
 │   ├── EventTracker.ts
 │   └── ReplayPlayer.ts
+├── lobby/
+│   ├── GameModuleRegistry.ts
+│   └── GameBundleManager.ts
 ├── generated/
 │   ├── api/
 │   └── pitaya/
-└── hall/
-client/assets/games/dawugui/
+client/assets/games/{gameId}/   # Remote Bundle
 ```
 
 ---
@@ -142,9 +174,11 @@ client/assets/games/dawugui/
 ## 9. 新游戏客户端
 
 1. 复制 `games/_template/`
-2. 订阅新 Push routes
-3. `request('game.{id}.*')` 调用
-4. Hall 注册入口 + ReplayPlayer 注册 event 映射
+2. 实现 `{GameId}Module.ts` 并注册 `GameModuleRegistry`
+3. 添加 `GameEntry.ts`（Bundle 入口）
+4. Cocos 编辑器将 `games/{id}/` 配置为 Remote Bundle
+5. 种子 `game_client_bundle` + migration
+6. `RoomScene` **无需修改**（通过 Registry 调用）
 
 ---
 

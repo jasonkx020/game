@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -20,10 +21,13 @@ const (
 )
 
 type User struct {
-	ID       int64  `db:"id"`
-	Phone    string `db:"phone"`
-	Nickname string `db:"nickname"`
-	Role     string `db:"role"`
+	ID          int64  `db:"id"`
+	Phone       string `db:"phone"`
+	Nickname    string `db:"nickname"`
+	Role        string `db:"role"`
+	AvatarURL   string `db:"avatar_url"`
+	Status      string `db:"status"`
+	LastLoginAt *time.Time `db:"last_login_at"`
 }
 
 type Service struct {
@@ -41,11 +45,11 @@ func (s *Service) Login(ctx context.Context, phone, smsCode string) (*User, stri
 		return nil, "", ErrInvalidSMS
 	}
 	var u User
-	err := s.db.GetContext(ctx, &u, `SELECT id, phone, nickname, role FROM users WHERE phone=$1`, phone)
+	err := s.db.GetContext(ctx, &u, `SELECT id, phone, nickname, role, avatar_url, status, last_login_at FROM users WHERE phone=$1`, phone)
 	if err != nil {
 		nickname := fmt.Sprintf("玩家%s", phone[len(phone)-4:])
 		err = s.db.QueryRowxContext(ctx,
-			`INSERT INTO users (phone, nickname, role) VALUES ($1, $2, 'player') RETURNING id, phone, nickname, role`,
+			`INSERT INTO users (phone, nickname, role) VALUES ($1, $2, 'player') RETURNING id, phone, nickname, role, avatar_url, status, last_login_at`,
 			phone, nickname).StructScan(&u)
 		if err != nil {
 			return nil, "", err
@@ -55,6 +59,8 @@ func (s *Service) Login(ctx context.Context, phone, smsCode string) (*User, stri
 		_, _ = s.db.ExecContext(ctx,
 			`INSERT INTO wallet_game_coin (user_id, game_id, balance) VALUES ($1, 'dawugui', 0) ON CONFLICT DO NOTHING`, u.ID)
 	}
+	_, _ = s.db.ExecContext(ctx, `UPDATE users SET last_login_at=$1, updated_at=$1 WHERE id=$2`, time.Now(), u.ID)
+
 	token, err := s.issueToken(u.ID, u.Role)
 	if err != nil {
 		return nil, "", err
@@ -72,10 +78,39 @@ func (s *Service) Refresh(ctx context.Context, userID int64) (string, error) {
 
 func (s *Service) GetByID(ctx context.Context, userID int64) (*User, error) {
 	var u User
-	if err := s.db.GetContext(ctx, &u, `SELECT id, phone, nickname, role FROM users WHERE id=$1`, userID); err != nil {
+	if err := s.db.GetContext(ctx, &u, `SELECT id, phone, nickname, role, avatar_url, status, last_login_at FROM users WHERE id=$1`, userID); err != nil {
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (s *Service) GetSettings(ctx context.Context, userID int64) (map[string]interface{}, error) {
+	var raw []byte
+	err := s.db.GetContext(ctx, &raw, `SELECT settings FROM users WHERE id=$1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]interface{}{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &out)
+	}
+	return out, nil
+}
+
+func (s *Service) UpdateSettings(ctx context.Context, userID int64, patch map[string]interface{}) (map[string]interface{}, error) {
+	cur, err := s.GetSettings(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range patch {
+		cur[k] = v
+	}
+	b, _ := json.Marshal(cur)
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET settings=$1, updated_at=$2 WHERE id=$3`, b, time.Now(), userID)
+	if err != nil {
+		return nil, err
+	}
+	return cur, nil
 }
 
 func (s *Service) issueToken(userID int64, role string) (string, error) {
@@ -123,4 +158,11 @@ func ParseRole(tokenStr string, secret []byte) (string, error) {
 		return RolePlayer, nil
 	}
 	return role, nil
+}
+
+func MaskPhone(phone string) string {
+	if len(phone) < 7 {
+		return phone
+	}
+	return phone[:3] + "****" + phone[len(phone)-4:]
 }

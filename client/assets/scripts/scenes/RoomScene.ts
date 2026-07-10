@@ -1,9 +1,8 @@
 import { _decorator, Component, director, Label } from 'cc'
-import { registerDawuguiPushHandlers } from '../../games/dawugui/DawuguiPushHandler'
-import { registerLiuzichongPushHandlers, liuzichongState } from '../../games/liuzichong/LiuzichongPushHandler'
+import { companionHintsFromEvent } from '../../platform/companion/ProactiveTriggers'
+import { GameModuleRegistry } from '../../platform/lobby/GameModuleRegistry'
+import type { GameModuleContext } from '../../platform/lobby/GameModuleRegistry'
 import { GameSession } from '../../platform/sdk/GameSession'
-import { encodeProto, decodeProto } from '../../platform/sdk/protoHelpers'
-import { PassReq, PassRsp, PlayCardsReq, PlayCardsRsp } from '../../platform/generated/pitaya/pitaya/dawugui'
 import { SessionStore } from '../SessionStore'
 
 const { ccclass, property } = _decorator
@@ -13,14 +12,27 @@ export class RoomScene extends Component {
   @property(Label)
   logLabel: Label | null = null
 
+  @property(Label)
+  companionHintLabel: Label | null = null
+
+  private moduleCtx: GameModuleContext | null = null
+
   async start(): Promise<void> {
     if (!SessionStore.login || !SessionStore.room) {
-      director.loadScene('Hall')
+      director.loadScene('Lobby')
       return
     }
     const room = SessionStore.room
     const login = SessionStore.login
     const gameId = room.gameId || 'dawugui'
+
+    const mod = GameModuleRegistry.get(gameId)
+    if (!mod) {
+      SessionStore.appendLog(`[error] game module not loaded: ${gameId}`)
+      this.refreshLog()
+      director.loadScene('Lobby')
+      return
+    }
 
     SessionStore.session?.leave()
     const session = new GameSession({
@@ -32,21 +44,21 @@ export class RoomScene extends Component {
     })
     SessionStore.session = session
 
-    if (gameId === 'liuzichong') {
-      liuzichongState.reset()
-      registerLiuzichongPushHandlers(session.router, {
-        log: (line) => {
-          SessionStore.appendLog(line)
-          this.refreshLog()
-        },
-        userId: login.userId,
-      })
-    } else {
-      registerDawuguiPushHandlers(session.router, (line) => {
+    const ctx: GameModuleContext = {
+      router: session.router,
+      session,
+      roomId: room.roomId,
+      userId: login.userId,
+      log: (line) => {
         SessionStore.appendLog(line)
         this.refreshLog()
-      })
+        this.refreshCompanionFromLog(line)
+      },
     }
+    this.moduleCtx = ctx
+
+    mod.prepareRoom?.(ctx)
+    mod.registerPush(ctx)
 
     try {
       await session.enterRoom({
@@ -56,8 +68,9 @@ export class RoomScene extends Component {
       })
       SessionStore.appendLog(`[room] entered ${room.roomId} game=${gameId}`)
       this.refreshLog()
-      if (gameId === 'liuzichong') {
-        director.loadScene('Liuzichong')
+      const entryScene = mod.entryScene || room.entryScene
+      if (entryScene) {
+        director.loadScene(entryScene)
       }
     } catch (e) {
       console.error('[Room] enter failed', e)
@@ -67,30 +80,25 @@ export class RoomScene extends Component {
   }
 
   onDestroy(): void {
-    // Liuzichong 场景接管 session；打乌龟仍在 Room
-    if (SessionStore.room?.gameId !== 'liuzichong') {
+    const gameId = SessionStore.room?.gameId
+    const mod = gameId ? GameModuleRegistry.get(gameId) : undefined
+    if (!mod?.keepsSessionOnLeave) {
       SessionStore.session?.leave()
       SessionStore.session = null
     }
   }
 
   async onPassClick(): Promise<void> {
-    const session = SessionStore.session
-    if (!session || !SessionStore.room) return
-    const body = encodeProto(PassReq, { roomId: SessionStore.room.roomId })
-    const rsp = await session.pitaya.request('game.dawugui.pass', body)
-    decodeProto(PassRsp, rsp)
-    SessionStore.appendLog('[action] pass sent')
+    const mod = this.moduleCtx ? GameModuleRegistry.get(SessionStore.room?.gameId ?? '') : undefined
+    if (!mod?.onPassClick || !this.moduleCtx) return
+    await mod.onPassClick(this.moduleCtx)
     this.refreshLog()
   }
 
   async onPlayClick(): Promise<void> {
-    const session = SessionStore.session
-    if (!session || !SessionStore.room) return
-    const body = encodeProto(PlayCardsReq, { roomId: SessionStore.room.roomId, cards: [1] })
-    const rsp = await session.pitaya.request('game.dawugui.playcards', body)
-    decodeProto(PlayCardsRsp, rsp)
-    SessionStore.appendLog('[action] playcards sent')
+    const mod = this.moduleCtx ? GameModuleRegistry.get(SessionStore.room?.gameId ?? '') : undefined
+    if (!mod?.onPlayClick || !this.moduleCtx) return
+    await mod.onPlayClick(this.moduleCtx)
     this.refreshLog()
   }
 
@@ -98,5 +106,18 @@ export class RoomScene extends Component {
     if (this.logLabel) {
       this.logLabel.string = SessionStore.pushLogs.slice(-8).join('\n')
     }
+    if (this.companionHintLabel) {
+      const hints = SessionStore.companionHints.slice(-2)
+      this.companionHintLabel.string = hints.length ? `陪玩: ${hints.join(' | ')}` : ''
+    }
+  }
+
+  private refreshCompanionFromLog(line: string): void {
+    const gameId = SessionStore.room?.gameId ?? ''
+    let event = 'push'
+    if (line.includes('onAlert')) event = 'onAlert'
+    if (line.includes('onSettlement')) event = 'onSettlement'
+    companionHintsFromEvent(gameId, event, line)
+    this.refreshLog()
   }
 }

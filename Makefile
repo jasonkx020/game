@@ -1,4 +1,4 @@
-.PHONY: up down migrate migrate-down migrate-docker seed-dev gen-proto test run-api run-game run-admin tidy build-linux docker-build docker-up-prod
+.PHONY: up down migrate migrate-down migrate-docker seed-dev gen-proto test run-api run-game run-admin tidy build-linux docker-build docker-up-prod serve-bundles
 
 GOOS_LINUX ?= linux
 GOARCH ?= amd64
@@ -72,3 +72,8 @@ docker-build:
 
 docker-up-prod:
 	$(COMPOSE_PROD) up -d --build
+
+serve-bundles:
+	@mkdir -p client/build/bundles
+	@echo "Serving client/build/bundles on :8787 (requires python3)"
+	cd client/build/bundles && python3 -m http.server 8787

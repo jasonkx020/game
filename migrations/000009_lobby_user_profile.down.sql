@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS game_client_bundle;
+DROP TABLE IF EXISTS user_game_prefs;
+
+ALTER TABLE game_catalog DROP COLUMN IF EXISTS description;
+ALTER TABLE game_catalog DROP COLUMN IF EXISTS sort_order;
+ALTER TABLE game_catalog DROP COLUMN IF EXISTS icon_url;
+
+ALTER TABLE users DROP COLUMN IF EXISTS settings;
+ALTER TABLE users DROP COLUMN IF EXISTS last_login_at;
+ALTER TABLE users DROP COLUMN IF EXISTS updated_at;
+ALTER TABLE users DROP COLUMN IF EXISTS status;
+ALTER TABLE users DROP COLUMN IF EXISTS avatar_url;

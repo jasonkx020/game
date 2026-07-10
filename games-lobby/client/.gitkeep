@@ -1,0 +1,3 @@
+# 独立大厅 Cocos 工程占位
+# Phase 1：从 ../client 同步 platform/sdk、lobby、companion、host 与 Launch/Lobby/Room 场景
+# 详见 ../games-lobby/README.md

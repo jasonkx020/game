@@ -11,7 +11,9 @@ import (
 	"github.com/example/game/internal/config"
 	"github.com/example/game/internal/platform/catalog"
 	"github.com/example/game/internal/platform/club"
+	"github.com/example/game/internal/platform/companion"
 	"github.com/example/game/internal/platform/httpmw"
+	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/metrics"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/internal/platform/user"
@@ -26,7 +28,9 @@ type Server struct {
 	rooms   *room.Service
 	clubs   *club.Service
 	catalog *catalog.Service
-	metrics *metrics.Service
+	lobby     *lobby.Service
+	companion *companion.Service
+	metrics   *metrics.Service
 	audit   *audit.Generator
 	rdb     *goredis.Client
 }
@@ -38,13 +42,15 @@ func New(
 	rooms *room.Service,
 	clubs *club.Service,
 	catalog *catalog.Service,
+	lobbySvc *lobby.Service,
+	companionSvc *companion.Service,
 	metrics *metrics.Service,
 	gen *audit.Generator,
 	rdb *goredis.Client,
 ) *Server {
 	return &Server{
 		cfg: cfg, users: users, wallet: wallet, rooms: rooms,
-		clubs: clubs, catalog: catalog, metrics: metrics,
+		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc, metrics: metrics,
 		audit: gen, rdb: rdb,
 	}
 }
@@ -66,6 +72,15 @@ func (s *Server) Register(r *gin.Engine) {
 		auth.Use(httpmw.JWT(s.cfg.JWTSecret))
 		{
 			auth.GET("/user/profile", s.profile)
+			auth.GET("/user/settings", s.getUserSettings)
+			auth.PUT("/user/settings", s.putUserSettings)
+
+			auth.GET("/lobby/recommendations", s.lobbyRecommendations)
+			auth.POST("/companion/sessions", s.createCompanionSession)
+			auth.GET("/companion/sessions/:session_id/messages", s.listCompanionMessages)
+			auth.POST("/companion/sessions/:session_id/chat", s.companionChat)
+			auth.GET("/companion/personas", s.listCompanionPersonas)
+
 			auth.GET("/wallet/room-card", s.roomCardBalance)
 			auth.GET("/wallet/game-coin/:game_id", s.gameCoinBalance)
 			auth.POST("/wallet/room-card/recharge", s.mockRecharge)
@@ -73,6 +88,9 @@ func (s *Server) Register(r *gin.Engine) {
 
 			auth.GET("/games", s.listGames)
 			auth.GET("/games/:game_id/config", s.getGameConfig)
+
+			auth.GET("/lobby/games", s.listLobbyGames)
+			auth.PUT("/lobby/games", s.updateLobbyGames)
 
 			auth.POST("/clubs", s.createClub)
 			auth.GET("/clubs/:club_id", s.getClub)
@@ -132,6 +150,7 @@ func (s *Server) createRoom(c *gin.Context) {
 		RoomMode    string `json:"room_mode"`
 		PlayerCount int    `json:"player_count"`
 		ClubID      *int64 `json:"club_id"`
+		FillBots    bool   `json:"fill_bots"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
@@ -165,13 +184,17 @@ func (s *Server) createRoom(c *gin.Context) {
 	auditSN := s.audit.Next()
 	r, err := s.rooms.Create(c.Request.Context(), room.CreateParams{
 		OwnerID: uid, ClubID: req.ClubID, GameID: req.GameID, RoomMode: req.RoomMode,
-		PlayerCount: req.PlayerCount, Config: map[string]interface{}{"base_score": 1},
+		PlayerCount: req.PlayerCount, Config: map[string]interface{}{
+			"base_score": 1,
+			"fill_bots":  req.FillBots,
+		},
 		WSURL: s.cfg.PitayaWSURL, IdempotencyKey: idem, RoomCardCost: cost, AuditSN: auditSN,
 	})
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"code": 2001, "message": err.Error(), "request_id": c.GetString("request_id"), "audit_sn": auditSN})
 		return
 	}
+	_ = s.lobby.TouchLastPlayed(c.Request.Context(), uid, req.GameID)
 	c.JSON(http.StatusCreated, gin.H{
 		"room_id":  r.RoomID.String(),
 		"ws_url":   r.WSURL,

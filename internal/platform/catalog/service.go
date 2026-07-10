@@ -18,6 +18,8 @@ type GameSummary struct {
 	MinPlayers int    `db:"min_players" json:"min_players"`
 	MaxPlayers int    `db:"max_players" json:"max_players"`
 	Enabled    bool   `db:"enabled" json:"enabled"`
+	IconURL    string `db:"icon_url" json:"icon_url,omitempty"`
+	SortOrder  int    `db:"sort_order" json:"sort_order,omitempty"`
 }
 
 type GameConfig struct {
@@ -39,7 +41,7 @@ func NewService(db *sqlx.DB) *Service {
 func (s *Service) ListGames(ctx context.Context) ([]GameSummary, error) {
 	var games []GameSummary
 	err := s.db.SelectContext(ctx, &games,
-		`SELECT game_id, name, min_players, max_players, enabled FROM game_catalog WHERE enabled = true ORDER BY game_id`)
+		`SELECT game_id, name, min_players, max_players, enabled, icon_url, sort_order FROM game_catalog WHERE enabled = true ORDER BY sort_order, game_id`)
 	return games, err
 }
 

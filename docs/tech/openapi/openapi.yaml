@@ -28,6 +28,10 @@ tags:
     description: 俱乐部与代理
   - name: Game
     description: 游戏列表与配置
+  - name: Lobby
+    description: 游戏大厅与用户偏好
+  - name: Companion
+    description: AI 陪玩伴侣
   - name: Replay
     description: 战绩与对局回放
   - name: Audit
@@ -80,6 +84,20 @@ paths:
     $ref: './paths/game.yaml#/~1v1~1games'
   /v1/games/{game_id}/config:
     $ref: './paths/game.yaml#/~1v1~1games~1{game_id}~1config'
+  /v1/lobby/games:
+    $ref: './paths/lobby.yaml#/~1v1~1lobby~1games'
+  /v1/lobby/recommendations:
+    $ref: './paths/companion.yaml#/~1v1~1lobby~1recommendations'
+  /v1/companion/sessions:
+    $ref: './paths/companion.yaml#/~1v1~1companion~1sessions'
+  /v1/companion/sessions/{session_id}/messages:
+    $ref: './paths/companion.yaml#/~1v1~1companion~1sessions~1{session_id}~1messages'
+  /v1/companion/sessions/{session_id}/chat:
+    $ref: './paths/companion.yaml#/~1v1~1companion~1sessions~1{session_id}~1chat'
+  /v1/companion/personas:
+    $ref: './paths/companion.yaml#/~1v1~1companion~1personas'
+  /v1/user/settings:
+    $ref: './paths/companion.yaml#/~1v1~1user~1settings'
   /v1/users/me/matches:
     $ref: './paths/replay.yaml#/~1v1~1users~1me~1matches'
   /v1/rounds/{round_id}/replay:
@@ -120,6 +138,14 @@ components:
       $ref: './components/schemas.yaml#/RoomSummary'
     GameMeta:
       $ref: './components/schemas.yaml#/GameMeta'
+    GameListResponse:
+      $ref: './components/schemas.yaml#/GameListResponse'
+    LobbyGameItem:
+      $ref: './components/schemas.yaml#/LobbyGameItem'
+    LobbyGamesResponse:
+      $ref: './components/schemas.yaml#/LobbyGamesResponse'
+    UpdateLobbyGamesRequest:
+      $ref: './components/schemas.yaml#/UpdateLobbyGamesRequest'
     GameConfig:
       $ref: './components/schemas.yaml#/GameConfig'
     ClubSummary:

@@ -16,6 +16,7 @@ import (
 	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
+	"github.com/example/game/internal/pitaya/bot"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/roommeta"
 	"github.com/example/game/internal/pitaya/runtime"
@@ -75,6 +76,9 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 		room.RoomSeq++
 		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN", int64(userID), h.audit.Next(), []byte("{}"))
 	}
+	if meta.FillBots() {
+		bot.FillSeats(room, meta.PlayerCount)
+	}
 	group := roomID.String()
 	_ = pitaya.GroupCreate(ctx, group)
 	_ = pitaya.GroupAddMember(ctx, group, uid)
@@ -99,6 +103,7 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 	if seat, ok := room.Seats[userID]; ok {
 		seat.Ready = true
 	}
+	bot.MarkBotsReady(room)
 
 	eng, err := game.Get(room.GameID)
 	if err != nil {
@@ -125,6 +130,7 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 	if err := h.committer.CommitEvents(ctx, room, events, "game.room.ready"); err != nil {
 		return nil, err
 	}
+	_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
 	return &pb.ReadyRsp{}, nil
 }
 

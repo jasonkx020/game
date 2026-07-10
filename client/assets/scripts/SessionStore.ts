@@ -7,7 +7,9 @@ class SessionStoreImpl {
   login: LoginResult | null = null
   room: CreateRoomResult | null = null
   session: GameSession | null = null
+  companionSessionId: number | null = null
   pushLogs: string[] = []
+  companionHints: string[] = []
 
   appendLog(line: string): void {
     this.pushLogs.push(line)
@@ -17,6 +19,12 @@ class SessionStoreImpl {
   resetRoom(): void {
     this.room = null
     this.pushLogs = []
+    this.companionHints = []
+  }
+
+  appendCompanionHint(hint: string): void {
+    this.companionHints.push(hint)
+    if (this.companionHints.length > 20) this.companionHints.shift()
   }
 }
 

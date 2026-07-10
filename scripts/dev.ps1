@@ -14,7 +14,7 @@ param(
     [ValidateSet(
         'help', 'up', 'down', 'migrate', 'migrate-down', 'seed-dev',
         'run-api', 'run-game', 'run-admin', 'test', 'tidy',
-        'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build'
+        'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build', 'serve-bundles'
     )]
     [string]$Command = 'help'
 )
@@ -79,6 +79,7 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 gen-proto       生成 Go proto
   .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 bin/
   .\scripts\dev.ps1 docker-build    构建 Linux 生产镜像
+  .\scripts\dev.ps1 serve-bundles   本地托管游戏 Bundle (:8787)
 
 VS Code: 使用 Run and Debug -> Server (api + game)
 
@@ -137,5 +138,10 @@ switch ($Command) {
         docker build -f deploy/Dockerfile --target platform-api -t game-platform-api:latest .
         docker build -f deploy/Dockerfile --target game -t game-server:latest .
         Write-Host "Built game-platform-api:latest, game-server:latest (linux/amd64)"
+    }
+    'serve-bundles' {
+        $bundleRoot = Join-Path $Root 'client\build\bundles'
+        New-Item -ItemType Directory -Force -Path $bundleRoot | Out-Null
+        & (Join-Path $PSScriptRoot 'serve-bundles.ps1') -Root $bundleRoot
     }
 }

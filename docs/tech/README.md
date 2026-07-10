@@ -19,6 +19,7 @@
 | 8 | [pitaya-client.md](pitaya-client.md) | Cocos PitayaClient |
 | 9 | [game-framework.md](game-framework.md) | 游戏逻辑 |
 | 10 | [client-architecture.md](client-architecture.md) | 客户端 |
+| 11 | [adr/006-game-lobby-dynamic-bundle.md](adr/006-game-lobby-dynamic-bundle.md) | 游戏大厅与动态 Bundle |
 
 ---
 

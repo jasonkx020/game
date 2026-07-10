@@ -13,6 +13,9 @@ import (
 	"github.com/example/game/internal/platform/api"
 	"github.com/example/game/internal/platform/catalog"
 	"github.com/example/game/internal/platform/club"
+	"github.com/example/game/internal/platform/companion"
+	"github.com/example/game/internal/platform/companion/llm"
+	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/metrics"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/internal/platform/user"
@@ -49,9 +52,15 @@ func main() {
 	rooms := room.NewService(sqlDB)
 	clubs := club.NewService(sqlDB)
 	catalogSvc := catalog.NewService(sqlDB)
+	lobbySvc := lobby.NewService(sqlDB)
+	llmClient := llm.NewClient(llm.Config{
+		BaseURL: cfg.LLMBaseURL, APIKey: cfg.LLMAPIKey, Model: cfg.LLMModel, TimeoutSec: cfg.LLMTimeoutSec,
+	})
+	toolReg := companion.NewToolRegistry(sqlDB, lobbySvc, rooms, catalogSvc, cfg, gen)
+	companionSvc := companion.NewService(sqlDB, llmClient, toolReg, gen)
 	metricsSvc := metrics.NewService(sqlDB)
 
-	srv := api.New(cfg, users, wallets, rooms, clubs, catalogSvc, metricsSvc, gen, rdb)
+	srv := api.New(cfg, users, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, metricsSvc, gen, rdb)
 	r := gin.Default()
 	srv.Register(r)
 

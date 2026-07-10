@@ -20,6 +20,10 @@ type Config struct {
 	PitayaWSURL       string
 	SnowflakeWorkerID int64
 	CORSOrigins       []string
+	LLMBaseURL        string
+	LLMAPIKey         string
+	LLMModel          string
+	LLMTimeoutSec     int
 }
 
 func Load() (*Config, error) {
@@ -39,6 +43,9 @@ func Load() (*Config, error) {
 	v.SetDefault("PITAYA_WS_URL", "ws://localhost:3250")
 	v.SetDefault("SNOWFLAKE_WORKER_ID", 1)
 	v.SetDefault("CORS_ORIGINS", "http://localhost:5173")
+	v.SetDefault("LLM_BASE_URL", "https://api.openai.com/v1")
+	v.SetDefault("LLM_MODEL", "gpt-4o-mini")
+	v.SetDefault("LLM_TIMEOUT_SEC", 60)
 
 	if envPath := findEnvFile(); envPath != "" {
 		v.SetConfigFile(envPath)
@@ -65,6 +72,10 @@ func Load() (*Config, error) {
 		PitayaWSURL:       v.GetString("PITAYA_WS_URL"),
 		SnowflakeWorkerID: v.GetInt64("SNOWFLAKE_WORKER_ID"),
 		CORSOrigins:       corsOrigins,
+		LLMBaseURL:        v.GetString("LLM_BASE_URL"),
+		LLMAPIKey:         v.GetString("LLM_API_KEY"),
+		LLMModel:          v.GetString("LLM_MODEL"),
+		LLMTimeoutSec:     v.GetInt("LLM_TIMEOUT_SEC"),
 	}, nil
 }
 

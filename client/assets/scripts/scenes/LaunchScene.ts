@@ -16,7 +16,7 @@ export class LaunchScene extends Component {
     const code = this.codeInput?.string || '123456'
     try {
       SessionStore.login = await SessionStore.api.login(phone, code)
-      director.loadScene('Hall')
+      director.loadScene('Lobby')
     } catch (e) {
       console.error('[Launch] login failed', e)
     }

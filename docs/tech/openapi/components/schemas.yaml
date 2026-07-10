@@ -239,6 +239,103 @@ GameMeta:
       type: string
       format: uri
 
+GameListResponse:
+  type: object
+  required:
+    - games
+  properties:
+    games:
+      type: array
+      items:
+        $ref: '#/GameMeta'
+
+GameBundleMeta:
+  type: object
+  required:
+    - version
+    - url
+    - size_bytes
+  properties:
+    version:
+      type: string
+      example: "1.0.0"
+    url:
+      type: string
+      format: uri
+    size_bytes:
+      type: integer
+      format: int64
+    sha256:
+      type: string
+    entry_scene:
+      type: string
+    min_host_version:
+      type: string
+
+LobbyGameItem:
+  type: object
+  required:
+    - game_id
+    - name
+    - min_players
+    - max_players
+    - visible
+    - pinned
+    - sort_order
+  properties:
+    game_id:
+      type: string
+    name:
+      type: string
+    icon_url:
+      type: string
+      format: uri
+    description:
+      type: string
+    min_players:
+      type: integer
+    max_players:
+      type: integer
+    visible:
+      type: boolean
+    pinned:
+      type: boolean
+    sort_order:
+      type: integer
+    bundle:
+      $ref: '#/GameBundleMeta'
+
+LobbyGamesResponse:
+  type: object
+  required:
+    - games
+  properties:
+    games:
+      type: array
+      items:
+        $ref: '#/LobbyGameItem'
+
+UpdateLobbyGamesRequest:
+  type: object
+  required:
+    - games
+  properties:
+    games:
+      type: array
+      items:
+        type: object
+        required:
+          - game_id
+        properties:
+          game_id:
+            type: string
+          visible:
+            type: boolean
+          pinned:
+            type: boolean
+          sort_order:
+            type: integer
+
 GameConfig:
   type: object
   required:
