@@ -36,6 +36,8 @@ tags:
     description: 战绩与对局回放
   - name: Audit
     description: 运营审计与报表
+  - name: Admin
+    description: 运营后台管理员
 
 security:
   - bearerAuth: []
@@ -80,6 +82,14 @@ paths:
     $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1overview'
   /v1/admin/metrics/room-cards:
     $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1room-cards'
+  /v1/admin/auth/login:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1auth~1login'
+  /v1/admin/auth/refresh:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1auth~1refresh'
+  /v1/admin/users:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1users'
+  /v1/admin/players:
+    $ref: './paths/admin.yaml#/~1v1~1admin~1players'
   /v1/games:
     $ref: './paths/game.yaml#/~1v1~1games'
   /v1/games/{game_id}/config:

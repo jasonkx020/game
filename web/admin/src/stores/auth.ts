@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
       user_id: number
       nickname: string
       role: string
-    }>('/auth/login', { phone, sms_code: smsCode })
+    }>('/admin/auth/login', { phone, sms_code: smsCode })
     token.value = res.access_token
     user.value = { user_id: res.user_id, nickname: res.nickname, role: res.role }
     localStorage.setItem('access_token', res.access_token)

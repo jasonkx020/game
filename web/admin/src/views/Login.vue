@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <el-card class="login-card">
-      <h2>游戏运营后台</h2>
+      <h2>管理员登录</h2>
       <el-form @submit.prevent="onSubmit">
         <el-form-item label="手机号">
           <el-input v-model="phone" placeholder="13800000000" />

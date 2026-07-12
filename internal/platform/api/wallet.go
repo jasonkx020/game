@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Server) roomCardBalance(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -20,7 +20,7 @@ func (s *Server) roomCardBalance(c *gin.Context) {
 }
 
 func (s *Server) gameCoinBalance(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -34,7 +34,7 @@ func (s *Server) gameCoinBalance(c *gin.Context) {
 }
 
 func (s *Server) mockRecharge(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -57,7 +57,7 @@ func (s *Server) mockRecharge(c *gin.Context) {
 }
 
 func (s *Server) rechargeHistory(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}

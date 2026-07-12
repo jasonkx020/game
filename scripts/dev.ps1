@@ -54,6 +54,45 @@ function Invoke-Migrate {
     go run ./cmd/migrate @MigrateArgs
 }
 
+function Get-BufExe {
+    $candidates = @(
+        (Join-Path $(go env GOPATH) 'bin\buf.exe'),
+        (Join-Path $env:USERPROFILE 'go\bin\buf.exe')
+    )
+    $cmd = Get-Command buf -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source)) {
+        $candidates += $cmd.Source
+    }
+
+    foreach ($path in $candidates) {
+        if ($path -and (Test-Path -LiteralPath $path)) {
+            return (Resolve-Path -LiteralPath $path).Path
+        }
+    }
+
+    throw @"
+未找到 buf CLI。请安装后重试:
+  `$env:GOOS='windows'; `$env:GOARCH='amd64'
+  go install github.com/bufbuild/buf/cmd/buf@v1.71.0
+安装后 buf 位于 %USERPROFILE%\go\bin\buf.exe（本脚本会自动查找）
+"@
+}
+
+function Invoke-BufGenerate {
+    param([string]$Template = '')
+    $buf = Get-BufExe
+    Push-Location (Join-Path $Root 'proto')
+    try {
+        if ($Template) {
+            & $buf generate --template $Template
+        } else {
+            & $buf generate
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Invoke-MigrateDocker {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$MigrateArgs)
     $db = Get-MigrateDatabaseUrl
@@ -85,7 +124,8 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 run-game        启动 Pitaya game (:3250)
   .\scripts\dev.ps1 run-admin       启动运营后台 (:5173)
   .\scripts\dev.ps1 test            go test ./...
-  .\scripts\dev.ps1 gen-proto       生成 Go proto
+  .\scripts\dev.ps1 gen-proto       生成 Go proto（自动查找 buf.exe）
+  .\scripts\dev.ps1 gen-client-proto  生成客户端 TS proto
   .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 bin/
   .\scripts\dev.ps1 docker-build    构建 Linux 生产镜像
   .\scripts\dev.ps1 serve-bundles   本地托管游戏 Bundle (:8787)
@@ -128,14 +168,8 @@ switch ($Command) {
     'tidy' {
         go mod tidy
     }
-    'gen-proto' {
-        Push-Location proto
-        try { buf generate } finally { Pop-Location }
-    }
-    'gen-client-proto' {
-        Push-Location proto
-        try { buf generate --template buf.gen.client.yaml } finally { Pop-Location }
-    }
+    'gen-proto' { Invoke-BufGenerate }
+    'gen-client-proto' { Invoke-BufGenerate -Template 'buf.gen.client.yaml' }
     'build-linux' {
         $env:CGO_ENABLED = '0'
         $env:GOOS = 'linux'

@@ -1,8 +1,10 @@
 /v1/clubs:
   post:
     tags: [Club]
-    summary: 创建俱乐部
-    operationId: createClub
+    summary: 创建俱乐部（已废弃）
+    operationId: createClubDeprecated
+    deprecated: true
+    description: 请使用 POST /v1/admin/clubs，须 admin JWT（typ=admin）
     security:
       - bearerAuth: []
         signatureAuth: []
@@ -86,7 +88,8 @@
         description: 成功
   post:
     tags: [Club]
-    summary: 邀请/添加成员
+    summary: 邀请/添加成员（管理员）
+    description: 实际路径为 POST /v1/admin/clubs/{club_id}/members，须 admin JWT
     operationId: addClubMember
     security:
       - bearerAuth: []
@@ -198,16 +201,48 @@
         application/json:
           schema:
             type: object
-            required: [amount]
+            required: [amount, player_id]
             properties:
               amount:
                 type: integer
                 format: int64
+              player_id:
+                type: integer
+                format: int64
+                description: 扣款玩家 ID（players 表）
     responses:
       '200':
         description: 成功
 
 /v1/admin/clubs:
+  post:
+    tags: [Club]
+    summary: 创建俱乐部
+    operationId: adminCreateClub
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+    responses:
+      '201':
+        description: 已创建
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
   get:
     tags: [Club]
     summary: 运营后台俱乐部列表

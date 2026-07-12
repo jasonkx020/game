@@ -17,7 +17,7 @@ func (s *Server) login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
 	}
-	u, token, err := s.users.Login(c.Request.Context(), req.Phone, req.SMSCode)
+	p, token, err := s.players.Login(c.Request.Context(), req.Phone, req.SMSCode)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
@@ -26,18 +26,18 @@ func (s *Server) login(c *gin.Context) {
 		"access_token":  token,
 		"refresh_token": token,
 		"expires_in":    86400,
-		"user_id":       u.ID,
-		"nickname":      u.Nickname,
-		"role":          u.Role,
+		"user_id":       p.ID,
+		"nickname":      p.Nickname,
+		"role":          user.RolePlayer,
 	})
 }
 
 func (s *Server) refresh(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
-	newToken, err := s.users.Refresh(c.Request.Context(), uid)
+	newToken, err := s.players.Refresh(c.Request.Context(), uid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
@@ -46,21 +46,21 @@ func (s *Server) refresh(c *gin.Context) {
 }
 
 func (s *Server) profile(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
-	u, err := s.users.GetByID(c.Request.Context(), uid)
+	p, err := s.players.GetByID(c.Request.Context(), uid)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found", "request_id": c.GetString("request_id")})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"user_id":      u.ID,
-		"phone":        u.Phone,
-		"phone_masked": user.MaskPhone(u.Phone),
-		"nickname":     u.Nickname,
-		"role":         u.Role,
-		"avatar_url":   u.AvatarURL,
+		"user_id":      p.ID,
+		"phone":        p.Phone,
+		"phone_masked": user.MaskPhone(p.Phone),
+		"nickname":     p.Nickname,
+		"role":         user.RolePlayer,
+		"avatar_url":   p.AvatarURL,
 	})
 }

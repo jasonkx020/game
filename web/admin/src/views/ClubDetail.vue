@@ -10,6 +10,7 @@
           <div class="kpi-label">房卡池余额</div>
           <div class="kpi-value">{{ club?.pool_balance ?? 0 }}</div>
           <el-form inline style="margin-top: 12px">
+            <el-input v-model="transferPlayerId" placeholder="玩家 ID" style="width: 120px; margin-right: 8px" />
             <el-input-number v-model="transferAmount" :min="1" />
             <el-button type="primary" @click="transfer">划拨房卡</el-button>
           </el-form>
@@ -22,13 +23,13 @@
         <div class="member-header">
           <span>成员列表</span>
           <el-form inline>
-            <el-input v-model="newUserId" placeholder="用户 ID" style="width: 120px" />
+            <el-input v-model="newUserId" placeholder="玩家 ID" style="width: 120px" />
             <el-button type="primary" @click="addMember">添加成员</el-button>
           </el-form>
         </div>
       </template>
       <el-table :data="members" stripe>
-        <el-table-column prop="user_id" label="用户 ID" />
+        <el-table-column prop="user_id" label="玩家 ID" />
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="phone" label="手机号" />
         <el-table-column prop="role" label="角色" />
@@ -51,7 +52,7 @@ import { api } from '@/api/client'
 interface ClubDetail {
   id: number
   name: string
-  owner_user_id: number
+  owner_admin_id: number
   status: string
   pool_balance: number
 }
@@ -69,6 +70,7 @@ const loading = ref(false)
 const club = ref<ClubDetail | null>(null)
 const members = ref<Member[]>([])
 const transferAmount = ref(10)
+const transferPlayerId = ref('')
 const newUserId = ref('')
 
 async function load() {
@@ -86,9 +88,15 @@ async function load() {
 }
 
 async function transfer() {
+  const playerId = parseInt(transferPlayerId.value, 10)
+  if (!playerId) {
+    ElMessage.warning('请填写玩家 ID')
+    return
+  }
   try {
-    const res = await api.post<{ pool_balance: number }>(`/clubs/${clubId}/room-card/transfer`, {
+    const res = await api.post<{ pool_balance: number }>(`/admin/clubs/${clubId}/room-card/transfer`, {
       amount: transferAmount.value,
+      player_id: playerId,
     })
     if (club.value) club.value.pool_balance = res.pool_balance
     ElMessage.success('划拨成功')
@@ -102,7 +110,7 @@ async function addMember() {
   const uid = parseInt(newUserId.value, 10)
   if (!uid) return
   try {
-    await api.post(`/clubs/${clubId}/members`, { user_id: uid })
+    await api.post(`/admin/clubs/${clubId}/members`, { user_id: uid })
     ElMessage.success('已添加')
     newUserId.value = ''
     await load()
@@ -114,7 +122,7 @@ async function addMember() {
 
 async function removeMember(userId: number) {
   try {
-    await api.delete(`/clubs/${clubId}/members/${userId}`)
+    await api.delete(`/admin/clubs/${clubId}/members/${userId}`)
     ElMessage.success('已踢出')
     await load()
   } catch (e: unknown) {

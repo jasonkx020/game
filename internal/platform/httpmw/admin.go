@@ -30,6 +30,27 @@ func CORS(origins []string) gin.HandlerFunc {
 	}
 }
 
+func RequirePrincipalType(jwtSecret, want string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := bearerToken(c)
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "token required", "request_id": c.GetString("request_id")})
+			return
+		}
+		typ, err := user.ParsePrincipalType(token, []byte(jwtSecret))
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
+			return
+		}
+		if typ != want {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"code": 403, "message": "forbidden", "request_id": c.GetString("request_id")})
+			return
+		}
+		c.Set("principal_type", typ)
+		c.Next()
+	}
+}
+
 func RequireRole(jwtSecret string, roles ...string) gin.HandlerFunc {
 	roleSet := make(map[string]struct{}, len(roles))
 	for _, r := range roles {

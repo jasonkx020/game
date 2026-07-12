@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) listLobbyGames(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -22,7 +22,7 @@ func (s *Server) listLobbyGames(c *gin.Context) {
 }
 
 func (s *Server) updateLobbyGames(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}

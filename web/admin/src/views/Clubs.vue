@@ -8,7 +8,7 @@
     <el-table :data="clubs" stripe>
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="名称" />
-      <el-table-column prop="owner_user_id" label="群主 ID" />
+      <el-table-column prop="owner_admin_id" label="群主 ID" />
       <el-table-column prop="status" label="状态" />
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
@@ -35,7 +35,7 @@ import { api } from '@/api/client'
 interface Club {
   id: number
   name: string
-  owner_user_id: number
+  owner_admin_id: number
   status: string
 }
 
@@ -62,7 +62,7 @@ async function createClub() {
   if (!newName.value) return
   creating.value = true
   try {
-    await api.post('/clubs', { name: newName.value })
+    await api.post('/admin/clubs', { name: newName.value })
     ElMessage.success('创建成功')
     showCreate.value = false
     newName.value = ''

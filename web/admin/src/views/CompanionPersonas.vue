@@ -32,7 +32,7 @@ const personas = ref<Array<Record<string, string>>>([])
 
 onMounted(async () => {
   try {
-    const res = await api.get<{ personas: Array<Record<string, string>> }>('/v1/companion/personas')
+    const res = await api.get<{ personas: Array<Record<string, string>> }>('/companion/personas')
     personas.value = res.personas ?? []
   } catch (e) {
     console.error(e)

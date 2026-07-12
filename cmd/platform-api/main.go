@@ -10,6 +10,7 @@ import (
 	"github.com/example/game/internal/audit"
 	"github.com/example/game/internal/config"
 	"github.com/example/game/internal/db"
+	"github.com/example/game/internal/platform/adminuser"
 	"github.com/example/game/internal/platform/api"
 	"github.com/example/game/internal/platform/catalog"
 	"github.com/example/game/internal/platform/club"
@@ -17,8 +18,8 @@ import (
 	"github.com/example/game/internal/platform/companion/llm"
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/metrics"
+	"github.com/example/game/internal/platform/player"
 	"github.com/example/game/internal/platform/room"
-	"github.com/example/game/internal/platform/user"
 	"github.com/example/game/internal/platform/wallet"
 	iredis "github.com/example/game/internal/redis"
 )
@@ -47,7 +48,8 @@ func main() {
 	defer rdb.Close()
 
 	gen := audit.NewGenerator(cfg.SnowflakeWorkerID)
-	users := user.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
+	admins := adminuser.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
+	players := player.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
 	wallets := wallet.NewService(sqlDB)
 	rooms := room.NewService(sqlDB)
 	clubs := club.NewService(sqlDB)
@@ -60,7 +62,7 @@ func main() {
 	companionSvc := companion.NewService(sqlDB, llmClient, toolReg, gen)
 	metricsSvc := metrics.NewService(sqlDB)
 
-	srv := api.New(cfg, users, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, metricsSvc, gen, rdb)
+	srv := api.New(cfg, admins, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, metricsSvc, gen, rdb)
 	r := gin.Default()
 	srv.Register(r)
 

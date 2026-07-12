@@ -2,9 +2,9 @@
   post:
     tags:
       - Auth
-    summary: 短信验证码登录
+    summary: 游戏玩家短信验证码登录
     operationId: authLogin
-    description: 无需 Bearer Token，但必须携带 HMAC 签名 Header（见 http-signature.md）
+    description: 仅注册/登录游戏玩家（players 表）。无需 Bearer Token，但必须携带 HMAC 签名 Header（见 http-signature.md）
     security:
       - signatureAuth: []
     parameters:

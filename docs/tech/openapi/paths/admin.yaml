@@ -1,44 +1,233 @@
-/v1/admin/metrics/overview:
-  get:
-    tags: [Audit]
-    summary: 运营 KPI 概览
-    operationId: adminMetricsOverview
-    security:
-      - bearerAuth: []
-        signatureAuth: []
-    parameters:
-      - $ref: '../components/parameters.yaml#/XAppId'
-      - $ref: '../components/parameters.yaml#/XTimestamp'
-      - $ref: '../components/parameters.yaml#/XNonce'
-      - $ref: '../components/parameters.yaml#/XContentSha256'
-      - $ref: '../components/parameters.yaml#/XSignature'
-    responses:
-      '200':
-        description: 成功
-      '403':
-        $ref: '../components/responses.yaml#/Forbidden'
-
-/v1/admin/metrics/room-cards:
-  get:
-    tags: [Audit]
-    summary: 房卡销售/消耗趋势
-    operationId: adminMetricsRoomCards
-    security:
-      - bearerAuth: []
-        signatureAuth: []
-    parameters:
-      - $ref: '../components/parameters.yaml#/XAppId'
-      - $ref: '../components/parameters.yaml#/XTimestamp'
-      - $ref: '../components/parameters.yaml#/XNonce'
-      - $ref: '../components/parameters.yaml#/XContentSha256'
-      - $ref: '../components/parameters.yaml#/XSignature'
-      - name: days
-        in: query
-        schema:
-          type: integer
-          default: 7
-    responses:
-      '200':
-        description: 成功
-      '403':
-        $ref: '../components/responses.yaml#/Forbidden'
+/v1/admin/metrics/overview:
+  get:
+    tags: [Audit]
+    summary: 运营 KPI 概览
+    operationId: adminMetricsOverview
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/metrics/room-cards:
+  get:
+    tags: [Audit]
+    summary: 房卡销售/消耗趋势
+    operationId: adminMetricsRoomCards
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: days
+        in: query
+        schema:
+          type: integer
+          default: 7
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/auth/login:
+  post:
+    tags: [Admin]
+    summary: 管理员短信验证码登录
+    operationId: adminAuthLogin
+    description: 登录 admin_users（platform_admin / club_admin / agent）。无需 Bearer Token，须 HMAC 签名。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: 登录成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/LoginResponse'
+      '401':
+        $ref: '../components/responses.yaml#/SignatureInvalid'
+
+/v1/admin/auth/refresh:
+  post:
+    tags: [Admin]
+    summary: 刷新管理员 access_token
+    operationId: adminAuthRefresh
+    description: 须 admin JWT（typ=admin）及 HMAC 签名
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RefreshRequest'
+    responses:
+      '200':
+        description: 刷新成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/users:
+  get:
+    tags: [Admin]
+    summary: 管理员用户列表（仅 platform_admin）
+    operationId: adminListUsers
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      user_id:
+                        type: integer
+                        format: int64
+                      phone_masked:
+                        type: string
+                      nickname:
+                        type: string
+                      role:
+                        type: string
+                      status:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                      last_login_at:
+                        type: string
+                        format: date-time
+                        nullable: true
+                total:
+                  type: integer
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/players:
+  get:
+    tags: [Admin]
+    summary: 游戏玩家列表（仅 platform_admin）
+    operationId: adminListPlayers
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                players:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      player_id:
+                        type: integer
+                        format: int64
+                      phone_masked:
+                        type: string
+                      nickname:
+                        type: string
+                      status:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                      last_login_at:
+                        type: string
+                        format: date-time
+                        nullable: true
+                total:
+                  type: integer
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

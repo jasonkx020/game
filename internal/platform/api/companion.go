@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) createCompanionSession(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -27,7 +27,7 @@ func (s *Server) createCompanionSession(c *gin.Context) {
 }
 
 func (s *Server) listCompanionMessages(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -45,7 +45,7 @@ func (s *Server) listCompanionMessages(c *gin.Context) {
 }
 
 func (s *Server) companionChat(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -84,7 +84,7 @@ func (s *Server) listCompanionPersonas(c *gin.Context) {
 }
 
 func (s *Server) lobbyRecommendations(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -97,11 +97,11 @@ func (s *Server) lobbyRecommendations(c *gin.Context) {
 }
 
 func (s *Server) getUserSettings(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
-	settings, err := s.users.GetSettings(c.Request.Context(), uid)
+	settings, err := s.players.GetSettings(c.Request.Context(), uid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
@@ -110,7 +110,7 @@ func (s *Server) getUserSettings(c *gin.Context) {
 }
 
 func (s *Server) putUserSettings(c *gin.Context) {
-	uid, err := s.userID(c)
+	uid, err := s.playerID(c)
 	if err != nil {
 		return
 	}
@@ -121,7 +121,7 @@ func (s *Server) putUserSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
 	}
-	settings, err := s.users.UpdateSettings(c.Request.Context(), uid, req.Settings)
+	settings, err := s.players.UpdateSettings(c.Request.Context(), uid, req.Settings)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return

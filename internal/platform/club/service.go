@@ -18,11 +18,11 @@ var (
 )
 
 type Club struct {
-	ID          int64  `db:"id" json:"id"`
-	Name        string `db:"name" json:"name"`
-	OwnerUserID int64  `db:"owner_user_id" json:"owner_user_id"`
-	AgentID     *int64 `db:"agent_id" json:"agent_id,omitempty"`
-	Status      string `db:"status" json:"status"`
+	ID           int64  `db:"id" json:"id"`
+	Name         string `db:"name" json:"name"`
+	OwnerAdminID int64  `db:"owner_admin_id" json:"owner_admin_id"`
+	AgentID      *int64 `db:"agent_id" json:"agent_id,omitempty"`
+	Status       string `db:"status" json:"status"`
 }
 
 type Member struct {
@@ -42,7 +42,7 @@ func NewService(db *sqlx.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) Create(ctx context.Context, ownerID int64, name string) (*Club, error) {
+func (s *Service) Create(ctx context.Context, ownerAdminID int64, name string) (*Club, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -51,13 +51,9 @@ func (s *Service) Create(ctx context.Context, ownerID int64, name string) (*Club
 
 	var c Club
 	err = tx.QueryRowxContext(ctx,
-		`INSERT INTO club (name, owner_user_id) VALUES ($1, $2)
-		 RETURNING id, name, owner_user_id, agent_id, status`, name, ownerID).StructScan(&c)
+		`INSERT INTO club (name, owner_admin_id) VALUES ($1, $2)
+		 RETURNING id, name, owner_admin_id, agent_id, status`, name, ownerAdminID).StructScan(&c)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO club_member (club_id, user_id, role) VALUES ($1, $2, 'admin')`, c.ID, ownerID); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx,
@@ -70,7 +66,7 @@ func (s *Service) Create(ctx context.Context, ownerID int64, name string) (*Club
 func (s *Service) Get(ctx context.Context, clubID int64) (*Club, error) {
 	var c Club
 	if err := s.db.GetContext(ctx, &c,
-		`SELECT id, name, owner_user_id, agent_id, status FROM club WHERE id=$1 AND status='active'`, clubID); err != nil {
+		`SELECT id, name, owner_admin_id, agent_id, status FROM club WHERE id=$1 AND status='active'`, clubID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -79,42 +75,49 @@ func (s *Service) Get(ctx context.Context, clubID int64) (*Club, error) {
 	return &c, nil
 }
 
-func (s *Service) ListByUser(ctx context.Context, userID int64) ([]Club, error) {
+func (s *Service) ListByUser(ctx context.Context, playerID int64) ([]Club, error) {
 	var clubs []Club
 	err := s.db.SelectContext(ctx, &clubs,
-		`SELECT c.id, c.name, c.owner_user_id, c.agent_id, c.status
+		`SELECT c.id, c.name, c.owner_admin_id, c.agent_id, c.status
 		 FROM club c JOIN club_member m ON c.id = m.club_id
 		 WHERE m.user_id=$1 AND m.status='active' AND c.status='active'
-		 ORDER BY c.id`, userID)
+		 ORDER BY c.id`, playerID)
 	return clubs, err
 }
 
 func (s *Service) ListAll(ctx context.Context) ([]Club, error) {
 	var clubs []Club
 	err := s.db.SelectContext(ctx, &clubs,
-		`SELECT id, name, owner_user_id, agent_id, status FROM club WHERE status='active' ORDER BY id`)
+		`SELECT id, name, owner_admin_id, agent_id, status FROM club WHERE status='active' ORDER BY id`)
 	return clubs, err
 }
 
-func (s *Service) IsAdmin(ctx context.Context, clubID, userID int64) (bool, error) {
-	var role string
-	err := s.db.GetContext(ctx, &role,
-		`SELECT role FROM club_member WHERE club_id=$1 AND user_id=$2 AND status='active'`, clubID, userID)
+func (s *Service) RequireClubOwner(ctx context.Context, clubID, adminID int64) error {
+	var ownerID int64
+	err := s.db.GetContext(ctx, &ownerID,
+		`SELECT owner_admin_id FROM club WHERE id=$1 AND status='active'`, clubID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
+		return ErrNotFound
 	}
-	if err != nil {
-		return false, err
-	}
-	return role == "admin", nil
-}
-
-func (s *Service) RequireAdmin(ctx context.Context, clubID, userID int64) error {
-	ok, err := s.IsAdmin(ctx, clubID, userID)
 	if err != nil {
 		return err
 	}
-	if !ok {
+	if ownerID != adminID {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func (s *Service) RequireMember(ctx context.Context, clubID, playerID int64) error {
+	var exists bool
+	err := s.db.GetContext(ctx, &exists,
+		`SELECT EXISTS(
+			SELECT 1 FROM club_member WHERE club_id=$1 AND user_id=$2 AND status='active'
+		)`, clubID, playerID)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return ErrForbidden
 	}
 	return nil
@@ -123,35 +126,31 @@ func (s *Service) RequireAdmin(ctx context.Context, clubID, userID int64) error 
 func (s *Service) ListMembers(ctx context.Context, clubID int64) ([]Member, error) {
 	var members []Member
 	err := s.db.SelectContext(ctx, &members,
-		`SELECT m.club_id, m.user_id, m.role, m.status, u.nickname, u.phone
-		 FROM club_member m JOIN users u ON u.id = m.user_id
+		`SELECT m.club_id, m.user_id, m.role, m.status, p.nickname, p.phone
+		 FROM club_member m JOIN players p ON p.id = m.user_id
 		 WHERE m.club_id=$1 AND m.status='active' ORDER BY m.joined_at`, clubID)
 	return members, err
 }
 
-func (s *Service) AddMember(ctx context.Context, clubID, userID int64) error {
+func (s *Service) AddMember(ctx context.Context, clubID, playerID int64) error {
 	if _, err := s.Get(ctx, clubID); err != nil {
 		return err
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO club_member (club_id, user_id, role) VALUES ($1, $2, 'member')
-		 ON CONFLICT (club_id, user_id) DO UPDATE SET status='active'`, clubID, userID)
+		 ON CONFLICT (club_id, user_id) DO UPDATE SET status='active'`, clubID, playerID)
 	return err
 }
 
-func (s *Service) RemoveMember(ctx context.Context, clubID, targetUserID, actorID int64) error {
-	if err := s.RequireAdmin(ctx, clubID, actorID); err != nil {
+func (s *Service) RemoveMember(ctx context.Context, clubID, targetPlayerID, adminID int64) error {
+	if err := s.RequireClubOwner(ctx, clubID, adminID); err != nil {
 		return err
 	}
-	c, err := s.Get(ctx, clubID)
-	if err != nil {
+	if _, err := s.Get(ctx, clubID); err != nil {
 		return err
-	}
-	if c.OwnerUserID == targetUserID {
-		return fmt.Errorf("cannot remove club owner")
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE club_member SET status='removed' WHERE club_id=$1 AND user_id=$2`, clubID, targetUserID)
+		`UPDATE club_member SET status='removed' WHERE club_id=$1 AND user_id=$2`, clubID, targetPlayerID)
 	if err != nil {
 		return err
 	}
@@ -172,8 +171,8 @@ func (s *Service) PoolBalance(ctx context.Context, clubID int64) (int64, error) 
 	return bal, err
 }
 
-func (s *Service) TransferToPool(ctx context.Context, clubID, userID, amount int64, auditSN uint64) (int64, error) {
-	if err := s.RequireAdmin(ctx, clubID, userID); err != nil {
+func (s *Service) TransferToPool(ctx context.Context, clubID, adminID, playerID, amount int64, auditSN uint64) (int64, error) {
+	if err := s.RequireClubOwner(ctx, clubID, adminID); err != nil {
 		return 0, err
 	}
 	if amount <= 0 {
@@ -188,7 +187,7 @@ func (s *Service) TransferToPool(ctx context.Context, clubID, userID, amount int
 
 	var bal int64
 	if err := tx.GetContext(ctx, &bal,
-		`SELECT balance FROM wallet_room_card WHERE user_id=$1 FOR UPDATE`, userID); err != nil {
+		`SELECT balance FROM wallet_room_card WHERE user_id=$1 FOR UPDATE`, playerID); err != nil {
 		return 0, err
 	}
 	if bal < amount {
@@ -196,13 +195,13 @@ func (s *Service) TransferToPool(ctx context.Context, clubID, userID, amount int
 	}
 	newBal := bal - amount
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE wallet_room_card SET balance=$1, updated_at=now() WHERE user_id=$2`, newBal, userID); err != nil {
+		`UPDATE wallet_room_card SET balance=$1, updated_at=now() WHERE user_id=$2`, newBal, playerID); err != nil {
 		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO wallet_ledger (user_id, wallet_type, delta, balance_after, reason, ref_id, audit_sn)
 		 VALUES ($1, 'room_card', $2, $3, 'club_pool_transfer', NULL, $4)`,
-		userID, -amount, newBal, auditSN); err != nil {
+		playerID, -amount, newBal, auditSN); err != nil {
 		return 0, err
 	}
 

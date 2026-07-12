@@ -12,6 +12,8 @@ const router = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', component: () => import('@/views/Dashboard.vue') },
+        { path: 'users', component: () => import('@/views/Users.vue') },
+        { path: 'players', component: () => import('@/views/Players.vue') },
         { path: 'clubs', component: () => import('@/views/Clubs.vue') },
         { path: 'clubs/:id', component: () => import('@/views/ClubDetail.vue') },
         { path: 'recharge', component: () => import('@/views/Recharge.vue') },
