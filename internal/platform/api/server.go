@@ -17,6 +17,7 @@ import (
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/metrics"
 	"github.com/example/game/internal/platform/player"
+	"github.com/example/game/internal/platform/replay"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/internal/platform/user"
 	"github.com/example/game/internal/platform/wallet"
@@ -24,18 +25,19 @@ import (
 )
 
 type Server struct {
-	cfg     *config.Config
-	admins  *adminuser.Service
-	players *player.Service
-	wallet  *wallet.Service
-	rooms   *room.Service
-	clubs   *club.Service
-	catalog *catalog.Service
+	cfg       *config.Config
+	admins    *adminuser.Service
+	players   *player.Service
+	wallet    *wallet.Service
+	rooms     *room.Service
+	clubs     *club.Service
+	catalog   *catalog.Service
 	lobby     *lobby.Service
 	companion *companion.Service
 	metrics   *metrics.Service
-	audit   *audit.Generator
-	rdb     *goredis.Client
+	replay    *replay.Service
+	audit     *audit.Generator
+	rdb       *goredis.Client
 }
 
 func New(
@@ -49,13 +51,14 @@ func New(
 	lobbySvc *lobby.Service,
 	companionSvc *companion.Service,
 	metrics *metrics.Service,
+	replaySvc *replay.Service,
 	gen *audit.Generator,
 	rdb *goredis.Client,
 ) *Server {
 	return &Server{
 		cfg: cfg, admins: admins, players: players, wallet: wallet, rooms: rooms,
 		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc, metrics: metrics,
-		audit: gen, rdb: rdb,
+		replay: replaySvc, audit: gen, rdb: rdb,
 	}
 }
 
@@ -99,8 +102,10 @@ func (s *Server) Register(r *gin.Engine) {
 		auth.Use(httpmw.JWT(s.cfg.JWTSecret), jwtPlayer)
 		{
 			auth.GET("/user/profile", s.profile)
+			auth.PUT("/user/profile", s.putProfile)
 			auth.GET("/user/settings", s.getUserSettings)
 			auth.PUT("/user/settings", s.putUserSettings)
+			auth.GET("/users/me/matches", s.listMyMatches)
 
 			auth.GET("/lobby/recommendations", s.lobbyRecommendations)
 			auth.POST("/companion/sessions", s.createCompanionSession)

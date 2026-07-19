@@ -8,6 +8,15 @@ export interface LoginResult {
   role: string
 }
 
+export interface UserProfile {
+  userId: number
+  phone: string
+  phoneMasked?: string
+  nickname: string
+  role: string
+  avatarUrl?: string
+}
+
 export interface CreateRoomParams {
   gameId?: string
   roomMode?: string
@@ -44,6 +53,7 @@ export interface LobbyGameItem {
   visible: boolean
   pinned: boolean
   sortOrder: number
+  lastPlayedAt?: string
   bundle?: GameBundleInfo
 }
 
@@ -52,6 +62,28 @@ export interface LobbyGamePrefUpdate {
   visible?: boolean
   pinned?: boolean
   sortOrder?: number
+}
+
+export interface RechargeOrder {
+  productId: string
+  amountCny: number
+  cards: number
+  auditSn: number
+  createdAt: string
+}
+
+export interface MatchSummary {
+  roundId: string
+  roomId: string
+  roundNo: number
+  gameId: string
+  status: string
+  startedAt: string
+  endedAt?: string
+  myRuleScore: number
+  myCoinDelta: number
+  isWinner: boolean
+  replayAvailable: boolean
 }
 
 export interface ApiError {
@@ -76,6 +108,10 @@ export class ApiClient {
     this.token = token
   }
 
+  clearAccessToken(): void {
+    this.token = ''
+  }
+
   async login(phone: string, smsCode: string): Promise<LoginResult> {
     const res = await this.post<{
       access_token: string
@@ -92,14 +128,7 @@ export class ApiClient {
     }
   }
 
-  async getProfile(): Promise<{
-    userId: number
-    phone: string
-    phoneMasked?: string
-    nickname: string
-    role: string
-    avatarUrl?: string
-  }> {
+  async getProfile(): Promise<UserProfile> {
     const res = await this.get<{
       user_id: number
       phone: string
@@ -108,14 +137,22 @@ export class ApiClient {
       role: string
       avatar_url?: string
     }>('/v1/user/profile')
-    return {
-      userId: res.user_id,
-      phone: res.phone,
-      phoneMasked: res.phone_masked,
-      nickname: res.nickname,
-      role: res.role,
-      avatarUrl: res.avatar_url,
-    }
+    return this.mapProfile(res)
+  }
+
+  async updateProfile(patch: { nickname?: string; avatarUrl?: string }): Promise<UserProfile> {
+    const res = await this.put<{
+      user_id: number
+      phone: string
+      phone_masked?: string
+      nickname: string
+      role: string
+      avatar_url?: string
+    }>('/v1/user/profile', {
+      ...(patch.nickname !== undefined ? { nickname: patch.nickname } : {}),
+      ...(patch.avatarUrl !== undefined ? { avatar_url: patch.avatarUrl } : {}),
+    })
+    return this.mapProfile(res)
   }
 
   async listLobbyGames(): Promise<LobbyGameItem[]> {
@@ -169,6 +206,59 @@ export class ApiClient {
     return res.balance
   }
 
+  async getGameCoinBalance(gameId: string): Promise<number> {
+    const res = await this.get<{ balance: number }>(`/v1/wallet/game-coin/${encodeURIComponent(gameId)}`)
+    return res.balance
+  }
+
+  async getRechargeHistory(): Promise<RechargeOrder[]> {
+    const res = await this.get<{ orders: Array<Record<string, unknown>> }>('/v1/wallet/recharge/history')
+    return (res.orders ?? []).map((o) => ({
+      productId: String(o.product_id ?? ''),
+      amountCny: Number(o.amount_cny ?? 0),
+      cards: Number(o.cards ?? 0),
+      auditSn: Number(o.audit_sn ?? 0),
+      createdAt: String(o.created_at ?? ''),
+    }))
+  }
+
+  async listMyMatches(params: { gameId?: string; page?: number; pageSize?: number } = {}): Promise<{
+    items: MatchSummary[]
+    total: number
+    page: number
+    pageSize: number
+  }> {
+    const q = new URLSearchParams()
+    if (params.gameId) q.set('game_id', params.gameId)
+    if (params.page) q.set('page', String(params.page))
+    if (params.pageSize) q.set('page_size', String(params.pageSize))
+    const qs = q.toString()
+    const res = await this.get<{
+      items: Array<Record<string, unknown>>
+      total: number
+      page: number
+      page_size: number
+    }>(`/v1/users/me/matches${qs ? `?${qs}` : ''}`)
+    return {
+      items: (res.items ?? []).map((m) => ({
+        roundId: String(m.round_id),
+        roomId: String(m.room_id),
+        roundNo: Number(m.round_no),
+        gameId: String(m.game_id),
+        status: String(m.status),
+        startedAt: String(m.started_at),
+        endedAt: m.ended_at ? String(m.ended_at) : undefined,
+        myRuleScore: Number(m.my_rule_score ?? 0),
+        myCoinDelta: Number(m.my_coin_delta ?? 0),
+        isWinner: Boolean(m.is_winner),
+        replayAvailable: Boolean(m.replay_available),
+      })),
+      total: Number(res.total ?? 0),
+      page: Number(res.page ?? 1),
+      pageSize: Number(res.page_size ?? 20),
+    }
+  }
+
   async createRoom(params: CreateRoomParams = {}): Promise<CreateRoomResult> {
     const res = await this.post<{
       room_id: string
@@ -192,6 +282,29 @@ export class ApiClient {
     }
   }
 
+  async joinRoom(roomId: string): Promise<{ wsUrl: string }> {
+    const res = await this.post<{ ws_url: string }>(`/v1/rooms/${roomId}/join`, {})
+    return { wsUrl: res.ws_url }
+  }
+
+  private mapProfile(res: {
+    user_id: number
+    phone: string
+    phone_masked?: string
+    nickname: string
+    role: string
+    avatar_url?: string
+  }): UserProfile {
+    return {
+      userId: res.user_id,
+      phone: res.phone,
+      phoneMasked: res.phone_masked,
+      nickname: res.nickname,
+      role: res.role,
+      avatarUrl: res.avatar_url,
+    }
+  }
+
   private mapLobbyGame(g: Record<string, unknown>): LobbyGameItem {
     const bundle = g.bundle as Record<string, unknown> | undefined
     return {
@@ -204,6 +317,7 @@ export class ApiClient {
       visible: Boolean(g.visible),
       pinned: Boolean(g.pinned),
       sortOrder: Number(g.sort_order ?? 0),
+      lastPlayedAt: g.last_played_at ? String(g.last_played_at) : undefined,
       bundle: bundle
         ? {
             version: String(bundle.version ?? '1.0.0'),

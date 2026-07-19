@@ -19,6 +19,7 @@ import (
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/metrics"
 	"github.com/example/game/internal/platform/player"
+	"github.com/example/game/internal/platform/replay"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/internal/platform/wallet"
 	iredis "github.com/example/game/internal/redis"
@@ -61,8 +62,9 @@ func main() {
 	toolReg := companion.NewToolRegistry(sqlDB, lobbySvc, rooms, catalogSvc, cfg, gen)
 	companionSvc := companion.NewService(sqlDB, llmClient, toolReg, gen)
 	metricsSvc := metrics.NewService(sqlDB)
+	replaySvc := replay.NewService(sqlDB)
 
-	srv := api.New(cfg, admins, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, metricsSvc, gen, rdb)
+	srv := api.New(cfg, admins, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, metricsSvc, replaySvc, gen, rdb)
 	r := gin.Default()
 	srv.Register(r)
 

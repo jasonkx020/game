@@ -1,6 +1,7 @@
 import { _decorator, Component, EditBox, Label, Node, UITransform, Vec3 } from 'cc'
 import { CompanionClient, type CompanionMessage } from './CompanionClient'
 import { SessionStore } from '../../scripts/SessionStore'
+import { createUINode, ensureUILayer } from '../lobby/LobbyUIKit'
 
 const { ccclass, property } = _decorator
 
@@ -57,8 +58,28 @@ export class CompanionPanel extends Component {
   }
 
   async sendQuick(text: string): Promise<void> {
-    if (this.inputBox) this.inputBox.string = text
-    await this.onSendClick()
+    if (this.inputBox) {
+      this.inputBox.string = text
+      await this.onSendClick()
+      return
+    }
+    // 无输入框时（代码搭建 UI）直接发送快捷语
+    if (!text || !this.client || this.sending) return
+    this.sending = true
+    this.appendLine('我', text)
+    let assistant = ''
+    try {
+      await this.client.chatStream(this.sessionId, text, (chunk, done) => {
+        if (chunk) assistant += chunk
+        if (done) this.appendLine('小龟', assistant || '…')
+        this.refreshChat()
+      })
+    } catch (e) {
+      this.appendLine('小龟', '网络有点卡，稍后再聊～')
+      console.error('[Companion]', e)
+    } finally {
+      this.sending = false
+    }
   }
 
   private renderQuickActions(): void {
@@ -66,13 +87,14 @@ export class CompanionPanel extends Component {
     this.quickActionsRoot.removeAllChildren()
     const actions = ['推荐游戏', '讲讲打乌龟规则', '开一局4人打乌龟']
     actions.forEach((text, index) => {
-      const row = new Node(`quick-${index}`)
+      const row = createUINode(`quick-${index}`)
       row.addComponent(UITransform).setContentSize(200, 36)
       row.setPosition(new Vec3((index % 2) * 220 - 110, -Math.floor(index / 2) * 40, 0))
       const label = row.addComponent(Label)
       label.string = `[${text}]`
       label.fontSize = 18
       row.on(Node.EventType.TOUCH_END, () => void this.sendQuick(text))
+      ensureUILayer(row)
       this.quickActionsRoot.addChild(row)
     })
   }

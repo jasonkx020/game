@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -64,15 +65,17 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	room.Lock()
 	defer room.Unlock()
 
-	if _, ok := room.Seats[userID]; !ok {
+	seatInfo, ok := room.Seats[userID]
+	if !ok {
 		if room.PlayerCount() >= gameMeta.MaxPlayers {
 			return nil, pitaya.Error(nil, "SEAT_FULL")
 		}
 		seat := uint32(room.PlayerCount())
-		room.Seats[userID] = &runtime.Seat{
+		seatInfo = &runtime.Seat{
 			UserID: userID, Seat: seat, Nickname: "p" + uid, Online: true,
 			Role: runtime.SeatRolePlayer,
 		}
+		room.Seats[userID] = seatInfo
 		room.RoomSeq++
 		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN", int64(userID), h.audit.Next(), []byte("{}"))
 	}
@@ -83,7 +86,20 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	_ = pitaya.GroupCreate(ctx, group)
 	_ = pitaya.GroupAddMember(ctx, group, uid)
 
-	return &pb.JoinRsp{RoomId: req.RoomId, GameId: room.GameID, RoomMode: pb.RoomMode_ROOM_CARD}, nil
+	phase := pb.RoomPhase_IDLE
+	if room.EngineState != nil {
+		phase = pb.RoomPhase_PLAYING
+	}
+	players := protoPlayers(room)
+	h.pushRoomState(ctx, room, phase, players)
+
+	return &pb.JoinRsp{
+		RoomId:   req.RoomId,
+		GameId:   room.GameID,
+		RoomMode: pb.RoomMode_ROOM_CARD,
+		Seat:     seatInfo.Seat,
+		Players:  players,
+	}, nil
 }
 
 func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, error) {
@@ -110,6 +126,7 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 		return nil, err
 	}
 	if !room.AllReady(eng.Meta().MinPlayers) {
+		h.pushRoomState(ctx, room, pb.RoomPhase_IDLE, protoPlayers(room))
 		return &pb.ReadyRsp{}, nil
 	}
 
@@ -117,20 +134,23 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 	cfgBytes, _ := json.Marshal(map[string]interface{}{"base_score": 1})
 	round, err := h.actionLog.CreateRound(ctx, roomID, room.RoundNo, room.GameID, cfgBytes)
 	if err != nil {
-		return nil, err
+		return nil, pitaya.Error(err, "ROUND")
 	}
 	room.RoundID = round.RoundID
 	room.ActionSeq = 0
 
 	state, events, err := eng.NewState(room.Config, room.Players())
 	if err != nil {
-		return nil, err
+		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = state
-	if err := h.committer.CommitEvents(ctx, room, events, "game.room.ready"); err != nil {
+	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.room.ready"); err != nil {
 		return nil, err
 	}
+	h.pushRoomState(ctx, room, pb.RoomPhase_PLAYING, protoPlayers(room))
 	_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
+	_ = bot.RunLiuzichongBots(ctx, room, h.committer, h.audit, h.actionLog)
+	go h.tickRoom(roomID)
 	return &pb.ReadyRsp{}, nil
 }
 
@@ -147,6 +167,7 @@ func (h *Handler) Leave(ctx context.Context, req *pb.LeaveReq) (*pb.LeaveRsp, er
 		delete(room.Seats, userID)
 		room.RoomSeq++
 		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "LEAVE", int64(userID), h.audit.Next(), []byte("{}"))
+		h.pushRoomState(ctx, room, pb.RoomPhase_IDLE, protoPlayers(room))
 		room.Unlock()
 	}
 	_ = pitaya.GroupRemoveMember(ctx, req.RoomId, uid)
@@ -185,4 +206,102 @@ func (h *Handler) Sync(ctx context.Context, req *pb.SyncReq) (*pb.SyncRsp, error
 		latest = uint32(entries[len(entries)-1].ActionSeq)
 	}
 	return &pb.SyncRsp{RoundId: req.RoundId, LatestActionSeq: latest, Pushes: pushes}, nil
+}
+
+func (h *Handler) tickRoom(roomID uuid.UUID) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		room, ok := h.store.Get(roomID)
+		if !ok {
+			return
+		}
+		room.Lock()
+		if room.EngineState == nil || room.RoundID == uuid.Nil {
+			room.Unlock()
+			return
+		}
+		eng, err := game.Get(room.GameID)
+		if err != nil {
+			room.Unlock()
+			return
+		}
+		if end, ok := eng.CheckRoundEnd(room.EngineState); ok {
+			_ = end
+			room.Unlock()
+			return
+		}
+		newState, events, err := eng.OnTick(room.EngineState, time.Now())
+		if err != nil {
+			room.Unlock()
+			continue
+		}
+		if len(events) == 0 {
+			if end, ended := eng.CheckRoundEnd(newState); !ended {
+				_ = end
+				room.Unlock()
+				continue
+			}
+			// Timeout end with no push events — still settle below.
+		} else {
+			room.EngineState = newState
+			_ = h.committer.CommitEventsLocked(context.Background(), room, events, "game.room.tick")
+		}
+		room.EngineState = newState
+		if end, ok := eng.CheckRoundEnd(newState); ok {
+			settle, _ := eng.CalcSettlement(newState, end)
+			scoreProto := make([]*pb.EventPlayerScore, len(settle.Scores))
+			for i, sc := range settle.Scores {
+				scoreProto[i] = &pb.EventPlayerScore{UserId: sc.UserID, Seat: sc.Seat, RuleScore: sc.RuleScore}
+			}
+			settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
+				IsValid: settle.Valid, WinnerId: settle.WinnerID, Scores: scoreProto,
+			}}})
+			_ = h.committer.CommitEventsLocked(context.Background(), room, []engine.GameEvent{
+				{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
+			}, "game.room.tick")
+			payload, _ := json.Marshal(settle)
+			sn := h.audit.Next()
+			_ = h.actionLog.InsertSettlement(context.Background(), roomID, room.RoundID, room.GameID, sn, payload)
+			_ = h.actionLog.EndRound(context.Background(), room.RoundID, "ended", []int64{int64(settle.WinnerID)}, sn)
+			for _, s := range room.Seats {
+				s.Ready = false
+			}
+			room.Unlock()
+			return
+		}
+		_ = bot.RunDawuguiBots(context.Background(), room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunLiuzichongBots(context.Background(), room, h.committer, h.audit, h.actionLog)
+		room.Unlock()
+	}
+}
+
+func protoPlayers(room *runtime.RoomRuntime) []*pb.PlayerSeat {
+	seats := room.PlayerSeats()
+	out := make([]*pb.PlayerSeat, len(seats))
+	for i, s := range seats {
+		out[i] = &pb.PlayerSeat{
+			UserId: s.UserID, Seat: s.Seat, Nickname: s.Nickname,
+			Ready: s.Ready, Online: s.Online,
+		}
+	}
+	return out
+}
+
+func (h *Handler) pushRoomState(ctx context.Context, room *runtime.RoomRuntime, phase pb.RoomPhase, players []*pb.PlayerSeat) {
+	msg := &pb.RoomStatePush{
+		Header: &pb.PushHeader{
+			Meta: &pb.EventMeta{
+				RoomId:   room.RoomID.String(),
+				RoundNo:  uint32(room.RoundNo),
+				ServerTs: time.Now().UnixMilli(),
+			},
+			GameId: room.GameID,
+		},
+		Phase:    phase,
+		RoomMode: pb.RoomMode_ROOM_CARD,
+		Players:  players,
+		RoundNo:  uint32(room.RoundNo),
+	}
+	_ = pitaya.GroupBroadcast(ctx, "game", room.RoomID.String(), "onRoomState", msg)
 }

@@ -21,8 +21,19 @@ func CORS(origins []string) gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-App-Id, X-Timestamp, X-Nonce, X-Content-SHA256, X-Signature, Idempotency-Key")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Access-Control-Max-Age", "86400")
 		}
 		if c.Request.Method == http.MethodOptions {
+			// 预检必须带 Allow-Origin，否则浏览器不会发真正的 POST
+			if origin != "" {
+				if _, ok := allowed[origin]; !ok {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+						"code":    403,
+						"message": "cors origin not allowed: " + origin,
+					})
+					return
+				}
+			}
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}

@@ -1,5 +1,1 @@
-{
-  "name": "dawugui",
-  "version": "1.0.0",
-  "note": "Dev stub manifest. Replace with Cocos Creator remote bundle build output."
-}
+{"importBase":"import","nativeBase":"native","name":"dawugui","deps":[],"uuids":["1a1ZQhRt9Cjr80MIE7V2lr","2cWSSlT3lMgr9u82StIoY0","4fA+7RWqpNd43DeWzsuAUY","82xcXqGYZO6ooWguTo4dZp","ced0NXPMVOmLCMl56943Is"],"paths":{"0":["ASSETS",0,1],"1":["textures/README",0,1],"2":["ui/README",0,1],"3":["images/README",0,1],"4":["audio/README",0,1]},"scenes":{},"packs":{},"versions":{"import":[],"native":[]},"redirect":[],"debug":false,"extensionMap":{},"hasPreloadScript":true,"dependencyRelationships":{},"types":["cc.TextAsset"]}

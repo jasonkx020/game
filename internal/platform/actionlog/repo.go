@@ -23,12 +23,12 @@ type Entry struct {
 }
 
 type Round struct {
-	RoundID        uuid.UUID
-	RoomID         uuid.UUID
-	RoundNo        int
-	GameID         string
-	Status         string
-	ConfigSnapshot []byte
+	RoundID        uuid.UUID `db:"round_id"`
+	RoomID         uuid.UUID `db:"room_id"`
+	RoundNo        int       `db:"round_no"`
+	GameID         string    `db:"game_id"`
+	Status         string    `db:"status"`
+	ConfigSnapshot []byte    `db:"config_snapshot"`
 }
 
 type Repo struct {

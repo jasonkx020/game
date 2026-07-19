@@ -1,0 +1,10 @@
+用途：游戏 Bundle 资源目录
+- 在 Cocos 编辑器中将 assets/games/{gameId}/ 配置为 Remote Bundle
+- 通过 Inspector 拖拽引用，或 bundle.load('images/xxx/spriteFrame') 动态加载
+
+images/    图标、封面、小图
+textures/  牌面 / 棋盘 / 场景背景
+ui/        游戏内按钮、面板
+audio/     音效（可选）
+
+脚本与场景与资源同目录：*.ts、*.scene 放在 games/_template/ 根下。

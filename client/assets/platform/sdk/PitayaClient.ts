@@ -3,7 +3,7 @@ import {
   buildHandshakeAckPacket,
   buildHandshakePacket,
   buildHeartbeatPacket,
-  decodeMessage,
+  decodeMessageAsync,
   decodePackets,
   MessageType,
   PacketType,
@@ -116,7 +116,12 @@ export class PitayaClient {
     merged.set(chunk, this.buffer.length)
     const { packets, rest } = decodePackets(merged)
     this.buffer = rest
+    void this.dispatchPackets(packets)
+  }
 
+  private async dispatchPackets(
+    packets: { type: PacketType; data: Uint8Array }[],
+  ): Promise<void> {
     for (const pkt of packets) {
       switch (pkt.type) {
         case PacketType.Handshake:
@@ -139,7 +144,7 @@ export class PitayaClient {
           this.ws?.send(buildHeartbeatPacket())
           break
         case PacketType.Data:
-          this.handleDataPacket(pkt.data)
+          await this.handleDataPacket(pkt.data)
           break
         case PacketType.Kick:
           this.disconnect()
@@ -148,8 +153,8 @@ export class PitayaClient {
     }
   }
 
-  private handleDataPacket(data: Uint8Array): void {
-    const msg = decodeMessage(data)
+  private async handleDataPacket(data: Uint8Array): Promise<void> {
+    const msg = await decodeMessageAsync(data)
     if (msg.type === MessageType.Response) {
       const p = this.pending.get(msg.id)
       if (p) {

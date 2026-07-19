@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/topfreegames/pitaya/v2"
 	"github.com/topfreegames/pitaya/v2/acceptor"
@@ -55,6 +56,8 @@ func main() {
 	committer := &commit.Committer{Log: logRepo, Audit: gen}
 
 	conf := pitayaconfig.NewDefaultPitayaConfig()
+	// Client Pitaya codec historically lacked inflate; keep off unless both sides support zlib.
+	conf.Handler.Messages.Compression = false
 	builder := pitaya.NewDefaultBuilder(true, "game", pitaya.Standalone, map[string]string{}, *conf)
 	builder.Serializer = protobuf.NewSerializer()
 	builder.AddAcceptor(acceptor.NewWSAcceptor(fmt.Sprintf(":%d", cfg.PitayaWSPort)))
@@ -62,10 +65,12 @@ func main() {
 	pitaya.DefaultApp = app
 	session.DefaultSessionPool = builder.SessionPool
 
-	pitaya.Register(connector.New(cfg), component.WithName("connector"))
-	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB), component.WithName("room"))
-	pitaya.Register(dawugui.New(store, committer, gen, logRepo), component.WithName("dawugui"))
-	pitaya.Register(liuzichong.New(store, committer, gen, logRepo), component.WithName("liuzichong"))
+	// Client routes use lowercase methods (game.connector.entry); Pitaya defaults to Entry.
+	nameOpts := []component.Option{component.WithNameFunc(strings.ToLower)}
+	pitaya.Register(connector.New(cfg), append([]component.Option{component.WithName("connector")}, nameOpts...)...)
+	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB), append([]component.Option{component.WithName("room")}, nameOpts...)...)
+	pitaya.Register(dawugui.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("dawugui")}, nameOpts...)...)
+	pitaya.Register(liuzichong.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("liuzichong")}, nameOpts...)...)
 
 	slog.Info("game server listening", "port", cfg.PitayaWSPort)
 	pitaya.Start()

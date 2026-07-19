@@ -16,6 +16,8 @@ message JoinRsp {
   string room_id = 1;
   string game_id = 2;
   pitaya.common.RoomMode room_mode = 3;
+  uint32 seat = 4;
+  repeated pitaya.common.PlayerSeat players = 5;
 }
 
 message ReadyReq {

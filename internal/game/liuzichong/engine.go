@@ -19,12 +19,15 @@ const (
 )
 
 type State struct {
-	Phase       int
-	Players     []engine.Player
-	Board       [boardSize][boardSize]int // 0=empty 1=black 2=white
-	CurrentSeat uint32
-	WinnerSeat  uint32
+	Phase        int
+	Players      []engine.Player
+	Board        [boardSize][boardSize]int // 0=empty 1=black 2=white
+	CurrentSeat  uint32
+	WinnerSeat   uint32
+	TurnDeadline time.Time
 }
+
+const turnTimeout = 60 * time.Second
 
 func (s *State) GameID() string { return GameID }
 
@@ -46,9 +49,10 @@ func (e *Engine) NewState(cfg engine.GameConfig, players []engine.Player) (engin
 		return nil, nil, fmt.Errorf("liuzichong requires 2 players, got %d", len(players))
 	}
 	st := &State{
-		Phase:       phasePlaying,
-		Players:     append([]engine.Player(nil), players...),
-		CurrentSeat: players[0].Seat,
+		Phase:        phasePlaying,
+		Players:      append([]engine.Player(nil), players...),
+		CurrentSeat:  players[0].Seat,
+		TurnDeadline: time.Now().Add(turnTimeout),
 	}
 	initBoard(&st.Board)
 
@@ -57,7 +61,7 @@ func (e *Engine) NewState(cfg engine.GameConfig, players []engine.Player) (engin
 		Cells: cells, FirstSeat: st.CurrentSeat,
 	}}})
 	turnEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Turn{Turn: &pb.TurnEvent{
-		CurrentSeat: st.CurrentSeat, TimeoutMs: 60000,
+		CurrentSeat: st.CurrentSeat, TimeoutMs: uint32(turnTimeout / time.Millisecond),
 	}}})
 
 	events := []engine.GameEvent{
@@ -113,6 +117,7 @@ func (e *Engine) ApplyAction(state engine.GameState, action engine.Action) (engi
 
 	nextSeat := otherSeat(st.CurrentSeat)
 	st.CurrentSeat = nextSeat
+	st.TurnDeadline = time.Now().Add(turnTimeout)
 
 	if winnerColor := checkWinner(&st.Board, nextSeat); winnerColor > 0 {
 		st.Phase = phaseEnded
@@ -131,7 +136,7 @@ func (e *Engine) ApplyAction(state engine.GameState, action engine.Action) (engi
 		ToRow: uint32(tr), ToCol: uint32(tc), Captured: capProto, NextSeat: nextSeat,
 	}}})
 	turnEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Turn{Turn: &pb.TurnEvent{
-		CurrentSeat: nextSeat, TimeoutMs: 60000,
+		CurrentSeat: nextSeat, TimeoutMs: uint32(turnTimeout / time.Millisecond),
 	}}})
 	return st, []engine.GameEvent{
 		{Type: engine.EventMove, PushRoute: "onMoveResult", Seat: action.Seat, Payload: moveEv},
@@ -140,8 +145,17 @@ func (e *Engine) ApplyAction(state engine.GameState, action engine.Action) (engi
 }
 
 func (e *Engine) OnTick(state engine.GameState, now time.Time) (engine.GameState, []engine.GameEvent, error) {
-	_ = now
-	return state, nil, nil
+	st, ok := state.(*State)
+	if !ok || st.Phase != phasePlaying {
+		return state, nil, nil
+	}
+	if st.TurnDeadline.IsZero() || now.Before(st.TurnDeadline) {
+		return state, nil, nil
+	}
+	// Current player timed out → opponent wins.
+	st.Phase = phaseEnded
+	st.WinnerSeat = otherSeat(st.CurrentSeat)
+	return st, nil, nil
 }
 
 func (e *Engine) VisibleState(state engine.GameState, seat uint32) (interface{}, error) {
@@ -311,6 +325,40 @@ func hasLegalMoves(b *[boardSize][boardSize]int, player int) bool {
 		}
 	}
 	return false
+}
+
+// ListLegalMoves returns all orthogonal one-step moves for seat.
+func ListLegalMoves(st *State, seat uint32) []engine.Action {
+	color := seatColor(seat)
+	dirs := [][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+	var out []engine.Action
+	for r := 0; r < boardSize; r++ {
+		for c := 0; c < boardSize; c++ {
+			if st.Board[r][c] != color {
+				continue
+			}
+			for _, d := range dirs {
+				nr, nc := r+d[0], c+d[1]
+				if inBounds(nr, nc) && st.Board[nr][nc] == 0 {
+					out = append(out, engine.Action{
+						Kind: engine.ActionMove, Seat: seat,
+						FromRow: r, FromCol: c, ToRow: nr, ToCol: nc,
+					})
+				}
+			}
+		}
+	}
+	return out
+}
+
+// PreviewCaptureCount simulates a move and returns how many pieces would be captured.
+func PreviewCaptureCount(st *State, action engine.Action) int {
+	color := seatColor(action.Seat)
+	var board [boardSize][boardSize]int
+	board = st.Board
+	board[action.FromRow][action.FromCol] = 0
+	board[action.ToRow][action.ToCol] = color
+	return len(checkEat(&board, action.ToRow, action.ToCol, color))
 }
 
 func checkWinner(b *[boardSize][boardSize]int, nextSeat uint32) int {

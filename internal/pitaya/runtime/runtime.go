@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -88,6 +89,19 @@ func (r *RoomRuntime) Players() []engine.Player {
 			out = append(out, engine.Player{UserID: s.UserID, Seat: s.Seat, Nickname: s.Nickname})
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Seat < out[j].Seat })
+	return out
+}
+
+// PlayerSeats returns proto-ready seat snapshots sorted by seat index.
+func (r *RoomRuntime) PlayerSeats() []Seat {
+	out := make([]Seat, 0, len(r.Seats))
+	for _, s := range r.Seats {
+		if s.Role == SeatRolePlayer {
+			out = append(out, *s)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Seat < out[j].Seat })
 	return out
 }
 

@@ -14,7 +14,7 @@ export interface PlayCardsReq {
 }
 
 export interface PlayCardsRsp {
-  /** 首条 event 的 meta，便于 C2S 关联 */
+  /** 首条 event �?meta，便�?C2S 关联 */
   meta?: EventMeta | undefined;
 }
 
@@ -1435,14 +1435,8 @@ type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function longToNumber(int64: { toString(): string }): number {
-  const num = globalThis.Number(int64.toString());
-  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-  }
-  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-  }
-  return num;
+  // Snowflake audit_sn / bot uid may exceed MAX_SAFE_INTEGER; do not throw.
+  return globalThis.Number(int64.toString());
 }
 
 function isSet(value: any): boolean {

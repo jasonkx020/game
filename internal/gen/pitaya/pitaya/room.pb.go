@@ -78,6 +78,8 @@ type JoinRsp struct {
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	GameId        string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
 	RoomMode      RoomMode               `protobuf:"varint,3,opt,name=room_mode,json=roomMode,proto3,enum=pitaya.common.RoomMode" json:"room_mode,omitempty"`
+	Seat          uint32                 `protobuf:"varint,4,opt,name=seat,proto3" json:"seat,omitempty"`
+	Players       []*PlayerSeat          `protobuf:"bytes,5,rep,name=players,proto3" json:"players,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -131,6 +133,20 @@ func (x *JoinRsp) GetRoomMode() RoomMode {
 		return x.RoomMode
 	}
 	return RoomMode_ROOM_MODE_UNSPECIFIED
+}
+
+func (x *JoinRsp) GetSeat() uint32 {
+	if x != nil {
+		return x.Seat
+	}
+	return 0
+}
+
+func (x *JoinRsp) GetPlayers() []*PlayerSeat {
+	if x != nil {
+		return x.Players
+	}
+	return nil
 }
 
 type ReadyReq struct {
@@ -575,11 +591,13 @@ const file_pitaya_room_proto_rawDesc = "" +
 	"\aJoinReq\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1f\n" +
 	"\bpassword\x18\x02 \x01(\tH\x00R\bpassword\x88\x01\x01B\v\n" +
-	"\t_password\"q\n" +
+	"\t_password\"\xba\x01\n" +
 	"\aJoinRsp\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x124\n" +
-	"\troom_mode\x18\x03 \x01(\x0e2\x17.pitaya.common.RoomModeR\broomMode\"#\n" +
+	"\troom_mode\x18\x03 \x01(\x0e2\x17.pitaya.common.RoomModeR\broomMode\x12\x12\n" +
+	"\x04seat\x18\x04 \x01(\rR\x04seat\x123\n" +
+	"\aplayers\x18\x05 \x03(\v2\x19.pitaya.common.PlayerSeatR\aplayers\"#\n" +
 	"\bReadyReq\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\n" +
 	"\n" +
@@ -637,24 +655,25 @@ var file_pitaya_room_proto_goTypes = []any{
 	(*SyncPushItem)(nil),  // 8: pitaya.room.SyncPushItem
 	(*RoomStatePush)(nil), // 9: pitaya.room.RoomStatePush
 	(RoomMode)(0),         // 10: pitaya.common.RoomMode
-	(*GameEvent)(nil),     // 11: pitaya.event.GameEvent
-	(*PushHeader)(nil),    // 12: pitaya.common.PushHeader
-	(RoomPhase)(0),        // 13: pitaya.common.RoomPhase
-	(*PlayerSeat)(nil),    // 14: pitaya.common.PlayerSeat
+	(*PlayerSeat)(nil),    // 11: pitaya.common.PlayerSeat
+	(*GameEvent)(nil),     // 12: pitaya.event.GameEvent
+	(*PushHeader)(nil),    // 13: pitaya.common.PushHeader
+	(RoomPhase)(0),        // 14: pitaya.common.RoomPhase
 }
 var file_pitaya_room_proto_depIdxs = []int32{
 	10, // 0: pitaya.room.JoinRsp.room_mode:type_name -> pitaya.common.RoomMode
-	11, // 1: pitaya.room.SyncRsp.events:type_name -> pitaya.event.GameEvent
-	8,  // 2: pitaya.room.SyncRsp.pushes:type_name -> pitaya.room.SyncPushItem
-	12, // 3: pitaya.room.RoomStatePush.header:type_name -> pitaya.common.PushHeader
-	13, // 4: pitaya.room.RoomStatePush.phase:type_name -> pitaya.common.RoomPhase
-	10, // 5: pitaya.room.RoomStatePush.room_mode:type_name -> pitaya.common.RoomMode
-	14, // 6: pitaya.room.RoomStatePush.players:type_name -> pitaya.common.PlayerSeat
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 1: pitaya.room.JoinRsp.players:type_name -> pitaya.common.PlayerSeat
+	12, // 2: pitaya.room.SyncRsp.events:type_name -> pitaya.event.GameEvent
+	8,  // 3: pitaya.room.SyncRsp.pushes:type_name -> pitaya.room.SyncPushItem
+	13, // 4: pitaya.room.RoomStatePush.header:type_name -> pitaya.common.PushHeader
+	14, // 5: pitaya.room.RoomStatePush.phase:type_name -> pitaya.common.RoomPhase
+	10, // 6: pitaya.room.RoomStatePush.room_mode:type_name -> pitaya.common.RoomMode
+	11, // 7: pitaya.room.RoomStatePush.players:type_name -> pitaya.common.PlayerSeat
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pitaya_room_proto_init() }

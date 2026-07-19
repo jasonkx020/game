@@ -39,6 +39,7 @@ gen-proto:
 
 gen-client-proto:
 	cd proto && buf generate --template buf.gen.client.yaml
+	cd client && node scripts/patch-proto-long.mjs
 
 gen-client-api:
 	@echo ApiClient hand-written; skip OpenAPI codegen

@@ -18,6 +18,11 @@ export interface GameSessionOptions {
   onLog?: (line: string) => void
 }
 
+export interface EnterRoomResult {
+  seat: number
+  gameId: string
+}
+
 export class GameSession {
   readonly pitaya = new PitayaClient()
   readonly tracker = new EventTracker()
@@ -25,6 +30,7 @@ export class GameSession {
   private api: ApiClient
   private log: (line: string) => void
   roomId = ''
+  mySeat = -1
 
   constructor(opts: GameSessionOptions = {}) {
     this.api = opts.api ?? new ApiClient()
@@ -35,7 +41,7 @@ export class GameSession {
     return this.api
   }
 
-  async enterRoom(params: EnterRoomParams): Promise<void> {
+  async enterRoom(params: EnterRoomParams): Promise<EnterRoomResult> {
     this.roomId = params.roomId
     this.tracker.reset()
     attachEventTracker(this.pitaya, this.tracker)
@@ -66,12 +72,15 @@ export class GameSession {
     const joinBytes = encodeProto(JoinReq, { roomId: params.roomId })
     const joinRspBytes = await this.pitaya.request('game.room.join', joinBytes)
     const joinRsp = decodeProto(JoinRsp, joinRspBytes)
-    this.log(`[pitaya] join game=${joinRsp.gameId}`)
+    this.mySeat = joinRsp.seat ?? 0
+    this.log(`[pitaya] join game=${joinRsp.gameId} seat=${this.mySeat}`)
 
     const readyBytes = encodeProto(ReadyReq, { roomId: params.roomId })
     await this.pitaya.request('game.room.ready', readyBytes)
     decodeProto(ReadyRsp, new Uint8Array())
     this.log('[pitaya] ready sent')
+
+    return { seat: this.mySeat, gameId: joinRsp.gameId }
   }
 
   leave(): void {

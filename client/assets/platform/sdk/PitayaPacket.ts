@@ -77,7 +77,7 @@ export function encodeMessage(msg: PitayaMessage): Uint8Array {
   return Uint8Array.from(parts)
 }
 
-export function decodeMessage(data: Uint8Array): PitayaMessage {
+function parseMessageHeader(data: Uint8Array): { msg: PitayaMessage; gzip: boolean } {
   if (data.length < 1) throw new Error('invalid message')
   const flag = data[0]
   let offset = 1
@@ -108,9 +108,28 @@ export function decodeMessage(data: Uint8Array): PitayaMessage {
   }
 
   msg.data = data.subarray(offset)
-  if ((flag & GZIP_MASK) === GZIP_MASK) {
-    throw new Error('gzip message not supported')
+  return { msg, gzip: (flag & GZIP_MASK) === GZIP_MASK }
+}
+
+/** Pitaya "gzip" flag uses zlib (deflate wrapper), same as Go compress/zlib. */
+export async function inflateZlib(data: Uint8Array): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('gzip message not supported (no DecompressionStream)')
   }
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
+/** Sync decode; compressed payloads must use decodeMessageAsync. */
+export function decodeMessage(data: Uint8Array): PitayaMessage {
+  const { msg, gzip } = parseMessageHeader(data)
+  if (gzip) throw new Error('gzip message not supported; use decodeMessageAsync')
+  return msg
+}
+
+export async function decodeMessageAsync(data: Uint8Array): Promise<PitayaMessage> {
+  const { msg, gzip } = parseMessageHeader(data)
+  if (gzip) msg.data = await inflateZlib(msg.data)
   return msg
 }
 

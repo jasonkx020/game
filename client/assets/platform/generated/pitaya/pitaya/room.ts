@@ -27,6 +27,8 @@ export interface JoinRsp {
   roomId: string;
   gameId: string;
   roomMode: RoomMode;
+  seat: number;
+  players: PlayerSeat[];
 }
 
 export interface ReadyReq {
@@ -44,11 +46,11 @@ export interface LeaveReq {
 export interface LeaveRsp {
 }
 
-/** 断线补发 — since_action_seq 之后的事件 */
+/** 断线补发 �?since_action_seq 之后的事�?*/
 export interface SyncReq {
   roomId: string;
   roundId: string;
-  /** 0 表示从头（仅重连且未错过事件时用） */
+  /** 0 表示从头（仅重连且未错过事件时用�?*/
   sinceActionSeq: number;
 }
 
@@ -56,13 +58,13 @@ export interface SyncRsp {
   roundId: string;
   latestActionSeq: number;
   events: GameEvent[];
-  /** Handler 将 events 转为 Push 下发；或直接带 push_route + serialized push */
+  /** Handler �?events 转为 Push 下发；或直接�?push_route + serialized push */
   pushes: SyncPushItem[];
 }
 
 export interface SyncPushItem {
   pushRoute: string;
-  /** 已含 EventMeta 的 Push proto */
+  /** 已含 EventMeta �?Push proto */
   pushBody: Uint8Array;
 }
 
@@ -156,7 +158,7 @@ export const JoinReq: MessageFns<JoinReq> = {
 };
 
 function createBaseJoinRsp(): JoinRsp {
-  return { roomId: "", gameId: "", roomMode: 0 };
+  return { roomId: "", gameId: "", roomMode: 0, seat: 0, players: [] };
 }
 
 export const JoinRsp: MessageFns<JoinRsp> = {
@@ -169,6 +171,12 @@ export const JoinRsp: MessageFns<JoinRsp> = {
     }
     if (message.roomMode !== 0) {
       writer.uint32(24).int32(message.roomMode);
+    }
+    if (message.seat !== 0) {
+      writer.uint32(32).uint32(message.seat);
+    }
+    for (const v of message.players) {
+      PlayerSeat.encode(v!, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -204,6 +212,22 @@ export const JoinRsp: MessageFns<JoinRsp> = {
           message.roomMode = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.seat = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.players.push(PlayerSeat.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -230,6 +254,8 @@ export const JoinRsp: MessageFns<JoinRsp> = {
         : isSet(object.room_mode)
         ? roomModeFromJSON(object.room_mode)
         : 0,
+      seat: isSet(object.seat) ? globalThis.Number(object.seat) : 0,
+      players: globalThis.Array.isArray(object?.players) ? object.players.map((e: any) => PlayerSeat.fromJSON(e)) : [],
     };
   },
 
@@ -244,6 +270,12 @@ export const JoinRsp: MessageFns<JoinRsp> = {
     if (message.roomMode !== 0) {
       obj.roomMode = roomModeToJSON(message.roomMode);
     }
+    if (message.seat !== 0) {
+      obj.seat = Math.round(message.seat);
+    }
+    if (message.players?.length) {
+      obj.players = message.players.map((e) => PlayerSeat.toJSON(e));
+    }
     return obj;
   },
 
@@ -255,6 +287,8 @@ export const JoinRsp: MessageFns<JoinRsp> = {
     message.roomId = object.roomId ?? "";
     message.gameId = object.gameId ?? "";
     message.roomMode = object.roomMode ?? 0;
+    message.seat = object.seat ?? 0;
+    message.players = object.players?.map((e) => PlayerSeat.fromPartial(e)) || [];
     return message;
   },
 };
@@ -977,14 +1011,8 @@ type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function longToNumber(int64: { toString(): string }): number {
-  const num = globalThis.Number(int64.toString());
-  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-  }
-  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-  }
-  return num;
+  // Snowflake audit_sn / bot uid may exceed MAX_SAFE_INTEGER; do not throw.
+  return globalThis.Number(int64.toString());
 }
 
 function isSet(value: any): boolean {

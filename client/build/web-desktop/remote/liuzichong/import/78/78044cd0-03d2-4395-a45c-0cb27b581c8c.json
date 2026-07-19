@@ -1,0 +1,1 @@
+[1,0,0,[["cc.TextAsset",["_name","text"],1]],[[0,0,1,3]],[[0,"ASSETS","用途：游戏 Bundle 资源目录\n- 在 Cocos 编辑器中将 assets/games/{gameId}/ 配置为 Remote Bundle\n- 通过 Inspector 拖拽引用，或 bundle.load('images/xxx/spriteFrame') 动态加载\n\nimages/    图标、封面、小图\ntextures/  牌面 / 棋盘 / 场景背景\nui/        游戏内按钮、面板\naudio/     音效（可选）\n\n脚本与场景与资源同目录：*.ts、*.scene 放在 games/liuzichong/ 根下。\n"]],0,0,[],[],[]]

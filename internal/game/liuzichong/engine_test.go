@@ -2,6 +2,7 @@ package liuzichong
 
 import (
 	"testing"
+	"time"
 
 	"github.com/example/game/internal/game/engine"
 )
@@ -165,3 +166,104 @@ func TestEndToEndFlow(t *testing.T) {
 	}
 	_ = st // initial state used for NewState validation
 }
+
+func TestBoundaryCountsAsEmptyForCapture(t *testing.T) {
+	// HTML rule: 敌方外侧为空（边界算空）— 在棋盘边形成 己-己-敌 应可吃
+	eng := New()
+	st := &State{
+		Phase: phasePlaying, CurrentSeat: 0,
+		Players: []engine.Player{{UserID: 1, Seat: 0}, {UserID: 2, Seat: 1}},
+	}
+	// row0: B B W (at edge, left of first B is boundary = empty)
+	st.Board[0][0] = 1
+	st.Board[0][1] = 0
+	st.Board[0][2] = 2
+	st.Board[1][1] = 1
+	newSt, _, err := eng.ApplyAction(st, engine.Action{
+		Kind: engine.ActionMove, Seat: 0,
+		FromRow: 1, FromCol: 1, ToRow: 0, ToCol: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns := newSt.(*State)
+	if ns.Board[0][2] != 0 {
+		t.Fatal("expected edge capture of white at (0,2)")
+	}
+}
+
+func TestWinByNoLegalMoves(t *testing.T) {
+	eng := New()
+	st := &State{
+		Phase: phasePlaying, CurrentSeat: 0,
+		Players: []engine.Player{{UserID: 1, Seat: 0}, {UserID: 2, Seat: 1}},
+	}
+	// Surround white so after black move white has no empty adjacent
+	// Black fills so white at (1,1) is blocked; white has another piece that also can't move
+	for r := 0; r < boardSize; r++ {
+		for c := 0; c < boardSize; c++ {
+			st.Board[r][c] = 1
+		}
+	}
+	st.Board[1][1] = 2
+	st.Board[2][2] = 2
+	st.Board[0][0] = 0 // black will move here from (0,1) — wait need a legal black move
+	// Simpler: white pieces at corners with blacks blocking all adjacent empties after move
+	for r := 0; r < boardSize; r++ {
+		for c := 0; c < boardSize; c++ {
+			st.Board[r][c] = 0
+		}
+	}
+	// White has 2 pieces trapped: only empty cells are not adjacent to them after black fills last gap
+	st.Board[0][0] = 2
+	st.Board[0][1] = 1
+	st.Board[1][0] = 1
+	st.Board[3][3] = 2
+	st.Board[3][2] = 1
+	st.Board[2][3] = 1
+	st.Board[1][1] = 1
+	st.Board[2][2] = 0 // black moves (1,1)->(2,2) — white still has no moves if both trapped
+	// Actually (0,0) white adj: (0,1)=B (1,0)=B — trapped
+	// (3,3) white adj: (3,2)=B (2,3)=B — trapped
+	// After any black move that doesn't free them, white has no legal moves
+	st.Board[2][1] = 1
+	newSt, _, err := eng.ApplyAction(st, engine.Action{
+		Kind: engine.ActionMove, Seat: 0,
+		FromRow: 2, FromCol: 1, ToRow: 2, ToCol: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns := newSt.(*State)
+	if ns.Phase != phaseEnded || ns.WinnerSeat != 0 {
+		t.Fatalf("expected black win by no-move, phase=%d winner=%d", ns.Phase, ns.WinnerSeat)
+	}
+}
+
+func TestOnTickTimeout(t *testing.T) {
+	eng := New()
+	st := &State{
+		Phase: phasePlaying, CurrentSeat: 0,
+		Players:      []engine.Player{{UserID: 1, Seat: 0}, {UserID: 2, Seat: 1}},
+		TurnDeadline: time.Now().Add(-time.Second),
+	}
+	initBoard(&st.Board)
+	newSt, _, err := eng.OnTick(st, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns := newSt.(*State)
+	if ns.Phase != phaseEnded || ns.WinnerSeat != 1 {
+		t.Fatalf("expected white win on black timeout, got phase=%d winner=%d", ns.Phase, ns.WinnerSeat)
+	}
+}
+
+func TestListLegalMovesInitial(t *testing.T) {
+	st := &State{Phase: phasePlaying, CurrentSeat: 0}
+	initBoard(&st.Board)
+	moves := ListLegalMoves(st, 0)
+	if len(moves) == 0 {
+		t.Fatal("black should have legal opening moves")
+	}
+}
+

@@ -57,9 +57,11 @@ func (s *Service) Login(ctx context.Context, phone, smsCode string) (*Player, st
 		}
 		_, _ = s.db.ExecContext(ctx,
 			`INSERT INTO wallet_room_card (user_id, balance) VALUES ($1, 10) ON CONFLICT DO NOTHING`, p.ID)
-		_, _ = s.db.ExecContext(ctx,
-			`INSERT INTO wallet_game_coin (user_id, game_id, balance) VALUES ($1, 'dawugui', 0) ON CONFLICT DO NOTHING`, p.ID)
 	}
+	// 补齐游戏金币账户（含后上线的 liuzichong）
+	_, _ = s.db.ExecContext(ctx,
+		`INSERT INTO wallet_game_coin (user_id, game_id, balance) VALUES
+		 ($1, 'dawugui', 0), ($1, 'liuzichong', 0) ON CONFLICT DO NOTHING`, p.ID)
 	_, _ = s.db.ExecContext(ctx,
 		`UPDATE players SET last_login_at=$1, updated_at=$1 WHERE id=$2`, time.Now(), p.ID)
 
@@ -84,6 +86,33 @@ func (s *Service) GetByID(ctx context.Context, playerID int64) (*Player, error) 
 		return nil, err
 	}
 	return &p, nil
+}
+
+type UpdateProfileParams struct {
+	Nickname  *string
+	AvatarURL *string
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, playerID int64, params UpdateProfileParams) (*Player, error) {
+	p, err := s.GetByID(ctx, playerID)
+	if err != nil {
+		return nil, err
+	}
+	nickname := p.Nickname
+	avatarURL := p.AvatarURL
+	if params.Nickname != nil {
+		nickname = *params.Nickname
+	}
+	if params.AvatarURL != nil {
+		avatarURL = *params.AvatarURL
+	}
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE players SET nickname=$1, avatar_url=$2, updated_at=$3 WHERE id=$4`,
+		nickname, avatarURL, time.Now(), playerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetByID(ctx, playerID)
 }
 
 func (s *Service) GetSettings(ctx context.Context, playerID int64) (map[string]interface{}, error) {

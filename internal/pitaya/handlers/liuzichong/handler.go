@@ -14,6 +14,7 @@ import (
 	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
+	"github.com/example/game/internal/pitaya/bot"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/runtime"
 )
@@ -64,7 +65,7 @@ func (h *Handler) Move(ctx context.Context, req *pb.MoveReq) (*pb.MoveRsp, error
 		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = newState
-	if err := h.committer.CommitEvents(ctx, room, events, "game.liuzichong.move"); err != nil {
+	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.liuzichong.move"); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +78,7 @@ func (h *Handler) Move(ctx context.Context, req *pb.MoveReq) (*pb.MoveRsp, error
 		settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
 			IsValid: settle.Valid, WinnerId: settle.WinnerID, Scores: scoreProto,
 		}}})
-		_ = h.committer.CommitEvents(ctx, room, []engine.GameEvent{
+		_ = h.committer.CommitEventsLocked(ctx, room, []engine.GameEvent{
 			{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
 		}, "game.liuzichong.settlement")
 		payload, _ := json.Marshal(settle)
@@ -87,6 +88,8 @@ func (h *Handler) Move(ctx context.Context, req *pb.MoveReq) (*pb.MoveRsp, error
 		for _, s := range room.Seats {
 			s.Ready = false
 		}
+	} else {
+		_ = bot.RunLiuzichongBots(ctx, room, h.committer, h.audit, h.actionLog)
 	}
 
 	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.audit.Next()}

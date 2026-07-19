@@ -61,16 +61,28 @@ export class RoomScene extends Component {
     mod.registerPush(ctx)
 
     try {
-      await session.enterRoom({
+      const entered = await session.enterRoom({
         wsUrl: room.wsUrl,
         roomId: room.roomId,
         accessToken: login.accessToken,
       })
-      SessionStore.appendLog(`[room] entered ${room.roomId} game=${gameId}`)
+      SessionStore.mySeat = entered.seat
+      SessionStore.appendLog(`[room] entered ${room.roomId} game=${gameId} seat=${entered.seat}`)
       this.refreshLog()
       const entryScene = mod.entryScene || room.entryScene
       if (entryScene) {
-        director.loadScene(entryScene)
+        try {
+          await new Promise<void>((resolve, reject) => {
+            director.loadScene(entryScene, (err) => {
+              if (err) reject(err instanceof Error ? err : new Error(String(err)))
+              else resolve()
+            })
+          })
+        } catch (sceneErr) {
+          console.error('[Room] loadScene failed', entryScene, sceneErr)
+          SessionStore.appendLog(`[error] loadScene ${entryScene}: ${String(sceneErr)}`)
+          this.refreshLog()
+        }
       }
     } catch (e) {
       console.error('[Room] enter failed', e)

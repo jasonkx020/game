@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/jmoiron/sqlx"
@@ -43,6 +44,9 @@ func NewService(db *sqlx.DB) *Service {
 func (s *Service) RoomCardBalance(ctx context.Context, userID int64) (int64, error) {
 	var bal int64
 	err := s.db.GetContext(ctx, &bal, `SELECT balance FROM wallet_room_card WHERE user_id=$1`, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
 	return bal, err
 }
 
@@ -50,6 +54,10 @@ func (s *Service) GameCoinBalance(ctx context.Context, userID int64, gameID stri
 	var bal int64
 	err := s.db.GetContext(ctx, &bal,
 		`SELECT balance FROM wallet_game_coin WHERE user_id=$1 AND game_id=$2`, userID, gameID)
+	if errors.Is(err, sql.ErrNoRows) {
+		// 未开户的游戏金币按 0 返回，避免大厅列表因缺行 500
+		return 0, nil
+	}
 	return bal, err
 }
 

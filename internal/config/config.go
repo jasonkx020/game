@@ -42,7 +42,7 @@ func Load() (*Config, error) {
 	v.SetDefault("PITAYA_WS_PORT", 3250)
 	v.SetDefault("PITAYA_WS_URL", "ws://localhost:3250")
 	v.SetDefault("SNOWFLAKE_WORKER_ID", 1)
-	v.SetDefault("CORS_ORIGINS", "http://localhost:5173")
+	v.SetDefault("CORS_ORIGINS", "http://localhost:5173,http://localhost:7456,http://127.0.0.1:7456")
 	v.SetDefault("LLM_BASE_URL", "https://api.openai.com/v1")
 	v.SetDefault("LLM_MODEL", "gpt-4o-mini")
 	v.SetDefault("LLM_TIMEOUT_SEC", 60)

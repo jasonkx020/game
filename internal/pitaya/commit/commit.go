@@ -20,10 +20,16 @@ type Committer struct {
 	Audit *audit.Generator
 }
 
+// CommitEvents locks the room then commits. Callers that already hold room.Lock
+// must use CommitEventsLocked instead (sync.Mutex is not reentrant).
 func (c *Committer) CommitEvents(ctx context.Context, room *runtime.RoomRuntime, events []engine.GameEvent, c2sRoute string) error {
 	room.Lock()
 	defer room.Unlock()
+	return c.CommitEventsLocked(ctx, room, events, c2sRoute)
+}
 
+// CommitEventsLocked commits events while the caller already holds room.Lock.
+func (c *Committer) CommitEventsLocked(ctx context.Context, room *runtime.RoomRuntime, events []engine.GameEvent, c2sRoute string) error {
 	for _, ev := range events {
 		room.ActionSeq++
 		sn := c.Audit.Next()

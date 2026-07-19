@@ -52,7 +52,7 @@ func RunDawuguiBots(
 		if action.Kind == engine.ActionPass {
 			route = "game.dawugui.pass"
 		}
-		if err := committer.CommitEvents(ctx, room, events, route); err != nil {
+		if err := committer.CommitEventsLocked(ctx, room, events, route); err != nil {
 			return err
 		}
 		if end, ok := eng.CheckRoundEnd(newState); ok {
@@ -60,7 +60,7 @@ func RunDawuguiBots(
 			settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
 				IsValid: settle.Valid, WinnerId: settle.WinnerID,
 			}}})
-			_ = committer.CommitEvents(ctx, room, []engine.GameEvent{
+			_ = committer.CommitEventsLocked(ctx, room, []engine.GameEvent{
 				{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
 			}, "game.dawugui.settlement")
 			payload, _ := json.Marshal(settle)

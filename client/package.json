@@ -9,7 +9,8 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && node scripts/check-imports.mjs",
+    "scaffold:assets": "node scripts/scaffold-asset-dirs.mjs",
     "test:watch": "vitest"
   },
   "devDependencies": {

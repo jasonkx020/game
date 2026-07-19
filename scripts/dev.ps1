@@ -169,7 +169,11 @@ switch ($Command) {
         go mod tidy
     }
     'gen-proto' { Invoke-BufGenerate }
-    'gen-client-proto' { Invoke-BufGenerate -Template 'buf.gen.client.yaml' }
+    'gen-client-proto' {
+        Invoke-BufGenerate -Template 'buf.gen.client.yaml'
+        Push-Location client
+        try { node scripts/patch-proto-long.mjs } finally { Pop-Location }
+    }
     'build-linux' {
         $env:CGO_ENABLED = '0'
         $env:GOOS = 'linux'

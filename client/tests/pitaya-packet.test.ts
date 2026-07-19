@@ -53,4 +53,20 @@ describe('PitayaPacket', () => {
     expect(packets[0].type).toBe(PacketType.Heartbeat)
     expect(packets[1].type).toBe(PacketType.Data)
   })
+
+  it('inflates zlib-compressed response payload', async () => {
+    const { deflateSync } = await import('node:zlib')
+    const payload = new Uint8Array(200).fill(7)
+    const compressed = new Uint8Array(deflateSync(Buffer.from(payload)))
+    // Response id=1, no route; flag = (Response<<1) | GZIP = 0x04 | 0x10
+    const encoded = new Uint8Array(1 + 1 + compressed.length)
+    encoded[0] = 0x14
+    encoded[1] = 1
+    encoded.set(compressed, 2)
+    const { decodeMessageAsync } = await import('../assets/platform/sdk/PitayaPacket')
+    const decoded = await decodeMessageAsync(encoded)
+    expect(decoded.type).toBe(MessageType.Response)
+    expect(decoded.id).toBe(1)
+    expect([...decoded.data]).toEqual([...payload])
+  })
 })

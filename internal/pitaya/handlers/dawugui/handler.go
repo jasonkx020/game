@@ -70,7 +70,7 @@ func (h *Handler) apply(ctx context.Context, roomIDStr string, action engine.Act
 		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = newState
-	if err := h.committer.CommitEvents(ctx, room, events, "game.dawugui.playcards"); err != nil {
+	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.dawugui.playcards"); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (h *Handler) apply(ctx context.Context, roomIDStr string, action engine.Act
 		settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
 			IsValid: settle.Valid, WinnerId: settle.WinnerID,
 		}}})
-		_ = h.committer.CommitEvents(ctx, room, []engine.GameEvent{
+		_ = h.committer.CommitEventsLocked(ctx, room, []engine.GameEvent{
 			{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
 		}, "game.dawugui.settlement")
 		payload, _ := json.Marshal(settle)
@@ -124,7 +124,7 @@ func (h *Handler) applyPass(ctx context.Context, roomIDStr string) (*pb.PlayCard
 		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = newState
-	if err := h.committer.CommitEvents(ctx, room, events, "game.dawugui.pass"); err != nil {
+	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.dawugui.pass"); err != nil {
 		return nil, err
 	}
 	_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
