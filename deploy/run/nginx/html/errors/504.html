@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>504 网关超时 · YCWL FreeTV</title>
+  <link rel="stylesheet" href="/errors/ycwl-error.css">
+</head>
+<body>
+  <main class="page">
+    <header class="brand">
+      <div class="brand-mark">YCWL</div>
+      <div>
+        <div class="brand-title">FreeTV 公交数字标牌</div>
+        <div class="brand-sub">EDGE 网关 · Nginx</div>
+      </div>
+    </header>
+    <section class="card">
+      <p class="code danger">504</p>
+      <h1 class="title">网关超时</h1>
+      <p class="lead">上游服务在限定时间内未返回响应。大屏素材上传、OTA 包分发或远程会话可能耗时较长。</p>
+      <ul class="hints">
+        <li>大文件请走 <code>/files/</code> 或 MinIO <code>:9002</code>，并确认超时配置足够。</li>
+        <li>租户网关已配置较长 <code>proxy_read_timeout</code>；若仍超时请检查磁盘与网络。</li>
+        <li>WebSocket（<code>/ws/</code>、<code>/mqtt</code>）长连接断开也会表现为 504。</li>
+      </ul>
+      <div class="actions">
+        <a class="btn btn-primary" href="javascript:location.reload()">刷新重试</a>
+        <a class="btn btn-ghost" href="/">返回首页</a>
+      </div>
+      <p class="meta">运维提示：调高相关 location 的 <code>proxy_read_timeout</code> 或排查后端慢查询。</p>
+    </section>
+    <p class="footer">© YCWL · FreeTV EDGE Gateway</p>
+  </main>
+</body>
+</html>

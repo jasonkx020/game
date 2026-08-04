@@ -1,0 +1,7 @@
+# Rendered by render-postgresql-conf.ps1 - YCWL dev cluster
+# __AUTH_HINT__
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   all             all                                     __LOCAL_AUTH__
+host    all             all             127.0.0.1/32            __LOCAL_AUTH__
+host    all             all             ::1/128                 __LOCAL_AUTH__
+host    all             all             0.0.0.0/0               scram-sha-256

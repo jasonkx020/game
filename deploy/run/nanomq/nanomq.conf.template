@@ -1,0 +1,87 @@
+# YCWL NanoMQ Windows 配置模板（由 render-nanomq-conf.ps1 渲染）
+
+system {
+  num_taskq_thread = 4
+  num_work_thread = 4
+  parallel = 32
+  max_packet_size = 260KB
+  property_size = 32
+  msq_len = 2048
+  qos_duration = 10s
+  daemon = false
+}
+
+mqtt {
+  property_size = 32
+  max_packet_size = 260KB
+  max_mqueue_len = 2048
+  retry_interval = 10s
+  keepalive_multiplier = 1.25
+  connect_timeout = 60s
+  max_inflight_window = 2048
+  max_awaiting_rel = 10s
+  await_rel_timeout = 10s
+
+  listeners.tcp {
+    bind = "127.0.0.1:__MQTT_PORT__"
+  }
+
+#  listeners.ssl {
+#    bind = "0.0.0.0:__SSL_PORT__"
+#    keyfile = "__TLS_KEY_FILE__"
+#    certfile = "__TLS_CERT_FILE__"
+#    cacertfile = "__TLS_CA_FILE__"
+#    verify_peer = false
+#    fail_if_no_peer_cert = false
+#  }
+}
+
+auth {
+  allow_anonymous = false
+  no_match = deny
+  deny_action = disconnect
+
+  http_auth {
+    auth_req {
+      url = "__AUTH_URL__"
+      method = post
+      headers.content-type = "application/x-www-form-urlencoded"
+      params = { clientid = "%c", username = "%u", password = "%P", ipaddress = "%a" }
+    }
+#    super_req {
+#      url = "__SUPER_URL__"
+#      method = post
+#      headers.content-type = "application/x-www-form-urlencoded"
+#      params = { clientid = "%c", username = "%u", password = "%P", ipaddress = "%a" }
+#    }
+#    acl_req {
+#      url = "__ACL_URL__"
+#      method = post
+#      headers.content-type = "application/x-www-form-urlencoded"
+#      params = { clientid = "%c", username = "%u", access = "%A", topic = "%t", ipaddr = "%a", mountpoint = "%m" }
+#    }
+    timeout = 5s
+    connect_timeout = 5s
+    pool_size = 32
+    cache_ttl = 30s
+  }
+}
+
+http_server {
+  enable = true
+  port = __HTTP_PORT__
+  limit_conn = 32
+  parallel = 2
+  ip_addr = "127.0.0.1"
+}
+
+log {
+  to = [file, console]
+  level = __LOG_LEVEL__
+  dir = "__LOG_DIR__"
+  file = "nanomq.log"
+  rotation {
+    size = 10MB
+    count = 5
+  }
+}

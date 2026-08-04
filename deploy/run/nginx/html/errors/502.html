@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>502 上游不可用 · YCWL FreeTV</title>
+  <link rel="stylesheet" href="/errors/ycwl-error.css">
+</head>
+<body>
+  <main class="page">
+    <header class="brand">
+      <div class="brand-mark">YCWL</div>
+      <div>
+        <div class="brand-title">FreeTV 公交数字标牌</div>
+        <div class="brand-sub">EDGE 网关 · Nginx</div>
+      </div>
+    </header>
+    <section class="card">
+      <p class="code danger">502</p>
+      <h1 class="title">上游服务不可用</h1>
+      <p class="lead">Nginx 已启动，但无法从后端获得有效响应。通常是 API、前端开发服务或 MinIO 未运行。</p>
+      <ul class="hints">
+        <li>租户 API：<code>tenant-api</code> 监听 <code>127.0.0.1:8443</code></li>
+        <li>租户前端：<code>tenant-web</code> 开发服务 <code>127.0.0.1:2001</code></li>
+        <li>平台 API：<code>platform-api</code> 监听 <code>127.0.0.1:9443</code></li>
+        <li>MinIO：<code>127.0.0.1:9000</code>（API）/ <code>9001</code>（控制台）</li>
+        <li>PostgreSQL、Redis 异常也会导致 API 启动失败，请先检查依赖服务。</li>
+      </ul>
+      <div class="actions">
+        <a class="btn btn-primary" href="/api/v1/health">检查 API 健康</a>
+        <a class="btn btn-ghost" href="/">返回首页</a>
+      </div>
+      <p class="meta">运维提示：查看 <code>logs/error.log</code>、<code>logs/minio_*_error.log</code> 及后端进程日志。</p>
+    </section>
+    <p class="footer">© YCWL · FreeTV EDGE Gateway</p>
+  </main>
+</body>
+</html>

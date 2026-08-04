@@ -1,0 +1,32 @@
+; ==================== PostgreSQL Ubuntu 24.04 launcher config ====================
+; Copy to config.ini or merge with existing config.ini
+; Aligned with deploy/run/postgresql/*.sh and scripts/service-postgres.sh
+
+[PostgreSQL]
+; "." = auto-detect /usr/lib/postgresql/<version> or PATH
+install_path = .
+; Data directory (pg_ctl mode only)
+data_path = ./data
+port = 5432
+listen_bind = 127.0.0.1
+version = 16
+; run_mode: systemd = apt PostgreSQL service; pg_ctl = local cluster
+run_mode = systemd
+; Empty = auto-detect postgresql@16-main or postgresql
+systemd_service_name =
+add_firewall_rules = true
+log_dir = log
+
+[Superuser]
+user = postgres
+; Empty on Linux: init-db may use sudo -u postgres. Set for remote scram-sha-256.
+password =
+
+[Application]
+user = freetv
+password = changeme
+db_edge = freetv_edge
+db_cloud = freetv_cloud
+
+[Init]
+default_scope = tenant

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deploy/run — Windows 人工部署与运维手册</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --text: #1f2328;
+      --text-muted: #656d76;
+      --border: #d0d7de;
+      --accent: #0969da;
+      --accent-hover: #0550ae;
+      --code-bg: #f6f8fa;
+      --sidebar-width: 280px;
+      --header-height: 56px;
+    }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--header-height);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+  }
+  .top-bar h1 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+  }
+  .top-bar a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .top-bar a:hover { text-decoration: underline; }
+  .layout {
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    padding: 20px 16px 40px;
+    position: sticky;
+    top: var(--header-height);
+    height: calc(100vh - var(--header-height));
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .sidebar nav { font-size: 13px; }
+  .sidebar .nav-group { margin-bottom: 12px; }
+  .sidebar .nav-title {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .sidebar a {
+    display: block;
+    padding: 4px 8px;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 6px;
+  }
+  .sidebar a:hover { background: var(--bg); color: var(--accent); }
+  .content {
+    flex: 1;
+    min-width: 0;
+    padding: 32px 40px 80px;
+    background: var(--surface);
+  }
+  .content > section { margin-bottom: 48px; }
+  h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 28px 0 12px;
+  }
+  h4 { font-size: 15px; margin: 20px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 12px; padding-left: 24px; }
+  li { margin-bottom: 4px; }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg); font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 12px 0 16px;
+  }
+  code {
+    font-family: Consolas, "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 13px;
+  }
+  p code, li code, td code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .lead { font-size: 16px; color: var(--text-muted); }
+  .note {
+    background: #ddf4ff;
+    border: 1px solid #54aeff66;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .note strong { color: var(--accent); }
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .flow-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-weight: 500;
+  }
+  .flow-arrow { color: var(--text-muted); font-weight: bold; }
+  .badge {
+    display: inline-block;
+    background: #eaeef2;
+    color: var(--text);
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-hover); }
+  @media (max-width: 960px) {
+    .sidebar { display: none; }
+    .content { padding: 24px 20px 60px; }
+  }
+  @media print {
+    .sidebar, .top-bar a { display: none; }
+    .content { padding: 0; }
+  }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <h1>deploy/run — Windows 人工部署与运维手册</h1>
+    <a href="README.md">Markdown 版</a>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <nav>
+        <div class="nav-group">
+          <div class="nav-title">概览</div>
+          <a href="#intro">简介</a>
+          <a href="#structure">目录结构</a>
+          <a href="#ports">端口一览</a>
+          <a href="#startup">启动顺序</a>
+          <a href="#checklist">首次部署</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">组件</div>
+          <a href="#postgresql">PostgreSQL</a>
+          <a href="#minio">MinIO</a>
+          <a href="#nanomq">NanoMQ</a>
+          <a href="#nginx">Nginx</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">运维</div>
+          <a href="#ops">日常速查</a>
+          <a href="#security">安全建议</a>
+          <a href="#refs">相关文档</a>
+          <a href="#linux">Linux 说明</a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <section id="intro">
+        <p class="lead">本文档面向现场运维人员，说明如何在 <strong>Windows 10/11</strong> 上通过 <code>deploy/run/</code> 启动包人工部署与日常维护 <strong>PostgreSQL、MinIO、NanoMQ、Nginx</strong> 四个基础设施组件。</p>
+        <p>本目录提供便携脚本（<code>config.ini</code> + <code>.bat</code>），与 Linux 侧 <code>scripts/service-*.sh</code> 行为对齐。本文<strong>不包含</strong> tenant-api / tenant-web 的构建与打包，仅说明上述组件与后端的对接参数。</p>
+      </section>
+
+      <section id="structure">
+        <h2>目录结构</h2>
+        <pre><code>deploy/run/
+  README.md / README.html      # 运维主入口
+  postgresql/
+    config.ini, start-postgres.bat, stop-postgres.bat,
+    status-postgres.bat, init-db.bat, psql-client.bat
+  minio/
+    config.ini, start-minio.bat, stop-minio.bat,
+    status-minio.bat, minio-mc.bat, minio.exe, mc.exe
+  nanomq/
+    config.ini, start-nanomq.bat, stop-nanomq.bat,
+    render-nanomq-conf.ps1, bin/nanomq.exe
+  nginx/
+    nginx.exe, start-nginx.bat, stop-nginx.bat, reload-nginx.bat
+    conf/nginx.conf, conf/proxy/*.conf, conf/stream.conf, conf/ssl/</code></pre>
+      </section>
+
+      <section id="ports">
+        <h2>端口一览</h2>
+        <table>
+          <thead><tr><th>组件</th><th>默认端口</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td>5432</td><td>应用库 <code>freetv_edge</code>（EDGE）、<code>freetv_cloud</code>（CLOUD）</td></tr>
+            <tr><td>MinIO API</td><td>9000</td><td>S3 API，<code>listen_bind</code> 默认 <code>127.0.0.1</code></td></tr>
+            <tr><td>MinIO Console</td><td>9001</td><td>Web 管理控制台</td></tr>
+            <tr><td>NanoMQ MQTT</td><td>1883</td><td>设备/Hub TCP 连接</td></tr>
+            <tr><td>NanoMQ HTTP</td><td>8082</td><td>本机运维 REST（仅 127.0.0.1）</td></tr>
+            <tr><td>NanoMQ WebSocket</td><td>8083</td><td>WS 监听（nginx 可代理为 WSS :8084）</td></tr>
+            <tr><td>Nginx HTTP</td><td>80</td><td>跳转至 HTTPS :8081</td></tr>
+            <tr><td>Nginx 租户入口</td><td>8081</td><td>HTTPS：Web + API + <code>/files/</code> + MinIO 路径前缀</td></tr>
+            <tr><td>Nginx MinIO API</td><td>9002</td><td>独立 HTTPS 反代至 MinIO :9000</td></tr>
+            <tr><td>Nginx MinIO Console</td><td>9003</td><td>独立 HTTPS 反代至 MinIO :9001</td></tr>
+            <tr><td>Nginx MQTTS</td><td>8883</td><td>四层 TLS 代理至 NanoMQ :1883</td></tr>
+            <tr><td>Nginx WSS</td><td>8084</td><td>四层 TLS 代理至 NanoMQ WS :8083</td></tr>
+            <tr><td>Nginx 平台后台</td><td>8080</td><td>HTTPS 反代 platform-api（可选）</td></tr>
+            <tr><td>tenant-api（上游）</td><td>8443</td><td>需另行启动，非本目录脚本</td></tr>
+            <tr><td>tenant-web（上游）</td><td>2001</td><td>需另行启动，nginx <code>tenant.conf</code> upstream</td></tr>
+          </tbody>
+        </table>
+        <p>端口可在各组件 <code>config.ini</code> 或 nginx <code>conf/proxy/*.conf</code> 中修改；修改后须同步 tenant-api 配置与防火墙规则。</p>
+      </section>
+
+      <section id="startup">
+        <h2>依赖与启动顺序</h2>
+        <div class="flow">
+          <span class="flow-box">PostgreSQL</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-box">tenant-api</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-box">NanoMQ</span>
+          <span class="flow-arrow">│</span>
+          <span class="flow-box">MinIO</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-box">Nginx</span>
+          <span class="flow-arrow">←</span>
+          <span class="flow-box">tenant-web</span>
+        </div>
+        <div class="note">
+          <strong>要点：</strong>
+          <ol>
+            <li>PostgreSQL 须最先就绪；tenant-api 依赖数据库 DSN。</li>
+            <li>NanoMQ 通过 HTTP 回调 tenant-api 完成 MQTT 认证；<code>start-nanomq.bat</code> 默认探测 <code>http://127.0.0.1:8443/api/v1/health</code>。</li>
+            <li>Nginx 反代 MinIO（:9000/:9001）及 tenant-api（:8443）、tenant-web（:2001）。</li>
+            <li><strong>勿同时</strong>将 EMQX 与 NanoMQ 作为 Hub 目标。</li>
+          </ol>
+        </div>
+
+        <h3>推荐启动顺序</h3>
+        <table>
+          <thead><tr><th>顺序</th><th>组件</th><th>命令</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>PostgreSQL</td><td><code>postgresql\start-postgres.bat</code></td></tr>
+            <tr><td>2</td><td>初始化库</td><td><code>postgresql\init-db.bat tenant --schema</code></td></tr>
+            <tr><td>3</td><td>MinIO</td><td><code>minio\start-minio.bat</code></td></tr>
+            <tr><td>4</td><td>MinIO bucket</td><td><code>minio\minio-mc.bat</code>（菜单选 3）</td></tr>
+            <tr><td>5</td><td>tenant-api</td><td>见 <code>ycwl-freetv-server-go/bin</code> 或 <code>deploy/README.md</code></td></tr>
+            <tr><td>6</td><td>tenant-web</td><td>端口与 nginx upstream 一致（默认 :2001）</td></tr>
+            <tr><td>7</td><td>NanoMQ</td><td><code>nanomq\start-nanomq.bat</code></td></tr>
+            <tr><td>8</td><td>Nginx</td><td><code>nginx\start-nginx.bat</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>推荐停止顺序（与启动相反）</h3>
+        <p>Nginx → NanoMQ → tenant-web / tenant-api → MinIO → PostgreSQL</p>
+      </section>
+
+      <section id="checklist">
+        <h2>首次部署 Checklist</h2>
+
+        <h3>1. 准备二进制与证书</h3>
+        <table>
+          <thead><tr><th>组件</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td>安装 PostgreSQL 16+，或 <code>run_mode=pg_ctl</code> 并将二进制放入 <code>postgresql/bin/</code></td></tr>
+            <tr><td>MinIO</td><td>将 <code>minio.exe</code>、<code>mc.exe</code> 放入 <code>minio/</code>（可自动下载 minio）</td></tr>
+            <tr><td>NanoMQ</td><td>从 <a href="https://nanomq.io/downloads" target="_blank" rel="noopener">nanomq.io/downloads</a> 解压到 <code>nanomq/bin/</code></td></tr>
+            <tr><td>Nginx</td><td>确认 <code>nginx.exe</code>；TLS 证书放入 <code>nginx/conf/ssl/</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>2. 编辑 config.ini</h3>
+        <p>使用生产密码，勿将示例占位符用于上线环境。</p>
+        <h4>PostgreSQL 示例</h4>
+        <pre><code>[PostgreSQL]
+install_path = C:\Program Files\PostgreSQL\16
+port = 5432
+listen_bind = 127.0.0.1
+run_mode = service
+
+[Application]
+user = freetv
+password = changeme
+db_edge = freetv_edge
+db_cloud = freetv_cloud</code></pre>
+
+        <h4>MinIO 示例</h4>
+        <pre><code>[MinIO]
+api_port = 9000
+console_port = 9001
+listen_bind = 127.0.0.1
+bucket = freetv-assets
+
+[Credentials]
+root_user = ycwlminio
+root_password = changeme</code></pre>
+
+        <h4>NanoMQ 示例</h4>
+        <pre><code>[NanoMQ]
+mqtt_port = 1883
+http_port = 8082
+ws_port = 8083
+
+[TenantAPI]
+base_url = http://127.0.0.1:8443
+check_health_before_start = true</code></pre>
+
+        <h3>3. 以管理员运行启动脚本</h3>
+        <p>首次启动会添加 Windows 防火墙入站规则。右键「以管理员身份运行」或由脚本自动提权。</p>
+
+        <h3>4. 按顺序启动并初始化</h3>
+        <pre><code>deploy\run\postgresql\start-postgres.bat
+deploy\run\postgresql\init-db.bat tenant --schema
+deploy\run\minio\start-minio.bat
+deploy\run\minio\minio-mc.bat
+REM 启动 tenant-api、tenant-web 后：
+deploy\run\nanomq\start-nanomq.bat
+deploy\run\nginx\start-nginx.bat</code></pre>
+        <p><code>start-minio.bat</code>、<code>start-postgres.bat</code> 会保持窗口打开；关闭窗口即停止进程。</p>
+
+        <h3>5. 验证</h3>
+        <table>
+          <thead><tr><th>组件</th><th>验证方式</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td><code>status-postgres.bat</code>；<code>psql-client.bat</code></td></tr>
+            <tr><td>MinIO</td><td><code>status-minio.bat</code>；浏览器 <code>http://127.0.0.1:9001</code></td></tr>
+            <tr><td>NanoMQ</td><td>MQTT 客户端连 <code>tcp://127.0.0.1:1883</code></td></tr>
+            <tr><td>Nginx</td><td><code>https://127.0.0.1:8081/</code></td></tr>
+            <tr><td>tenant-api</td><td><code>curl http://127.0.0.1:8443/api/v1/health</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="postgresql">
+        <h2>PostgreSQL</h2>
+        <h3>配置说明（config.ini）</h3>
+        <table>
+          <thead><tr><th>段</th><th>键</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td><code>install_path</code></td><td>PG 根目录（含 <code>bin\psql.exe</code>）</td></tr>
+            <tr><td>PostgreSQL</td><td><code>data_path</code></td><td>数据目录（仅 <code>pg_ctl</code> 模式）</td></tr>
+            <tr><td>PostgreSQL</td><td><code>port</code> / <code>listen_bind</code></td><td>监听端口与地址</td></tr>
+            <tr><td>PostgreSQL</td><td><code>run_mode</code></td><td><code>service</code> 或 <code>pg_ctl</code></td></tr>
+            <tr><td>Application</td><td><code>user</code> / <code>password</code></td><td>应用用户，须与 tenant-api DSN 一致</td></tr>
+            <tr><td>Application</td><td><code>db_edge</code> / <code>db_cloud</code></td><td>数据库名</td></tr>
+          </tbody>
+        </table>
+
+        <h3>日常命令</h3>
+        <table>
+          <thead><tr><th>命令</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>start-postgres.bat</code></td><td>启动</td></tr>
+            <tr><td><code>stop-postgres.bat</code></td><td>停止</td></tr>
+            <tr><td><code>status-postgres.bat</code></td><td>状态检查</td></tr>
+            <tr><td><code>init-db.bat tenant --schema</code></td><td>建 EDGE 库并导入 schema</td></tr>
+            <tr><td><code>psql-client.bat</code></td><td>交互式 psql</td></tr>
+          </tbody>
+        </table>
+
+        <h3>与 tenant-api 对接</h3>
+        <pre><code>ycwl:
+  db:
+    driver: postgres
+    dsn: postgres://freetv:changeme@127.0.0.1:5432/freetv_edge?sslmode=disable</code></pre>
+
+        <h3>常见问题</h3>
+        <table>
+          <thead><tr><th>现象</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td><code>service</code> 模式启动失败</td><td>确认已安装 PostgreSQL 16 且服务名正确</td></tr>
+            <tr><td><code>pg_ctl</code> 首次启动慢</td><td>自动 <code>initdb</code> 并渲染配置</td></tr>
+            <tr><td><code>pg_isready</code> 超时</td><td>查看 <code>log/postgresql.log</code></td></tr>
+            <tr><td><code>init-db</code> 连接失败</td><td>确认 PostgreSQL 已启动；超级用户密码正确</td></tr>
+          </tbody>
+        </table>
+        <p>更多细节见 <a href="postgresql/README.md">postgresql/README.md</a></p>
+      </section>
+
+      <section id="minio">
+        <h2>MinIO</h2>
+        <h3>配置说明（config.ini）</h3>
+        <table>
+          <thead><tr><th>段</th><th>键</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>MinIO</td><td><code>api_port</code> / <code>console_port</code></td><td>S3 API / Console 端口</td></tr>
+            <tr><td>MinIO</td><td><code>listen_bind</code></td><td><code>127.0.0.1</code> 仅本机；<code>0.0.0.0</code> 需防火墙</td></tr>
+            <tr><td>MinIO</td><td><code>bucket</code></td><td>默认 bucket</td></tr>
+            <tr><td>Credentials</td><td><code>root_user</code> / <code>root_password</code></td><td>须与 tenant-api 存储配置一致</td></tr>
+          </tbody>
+        </table>
+
+        <h3>日常命令</h3>
+        <table>
+          <thead><tr><th>命令</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>start-minio.bat</code></td><td>启动（保持窗口）</td></tr>
+            <tr><td><code>stop-minio.bat</code></td><td>停止</td></tr>
+            <tr><td><code>status-minio.bat</code></td><td>状态</td></tr>
+            <tr><td><code>minio-mc.bat</code></td><td>mc 客户端与 bucket 初始化</td></tr>
+          </tbody>
+        </table>
+
+        <h3>与 tenant-api 对接</h3>
+        <pre><code>ycwl:
+  storage:
+    use_minio: true
+    endpoint: http://127.0.0.1:9000
+    bucket: freetv-assets
+    access_key: ycwlminio
+    secret_key: changeme
+    public_url_prefix: https://127.0.0.1:8081/files</code></pre>
+        <div class="note">
+          <strong>重要：</strong> <code>endpoint</code> 填 MinIO <strong>直连</strong>地址，<strong>不要</strong>填 nginx URL。若 <code>data/</code> 已用旧密码初始化，改凭证后须删 <code>data/</code> 或保持原凭证。
+        </div>
+
+        <h3>常见问题</h3>
+        <table>
+          <thead><tr><th>现象</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>警告 <code>minioadmin:minioadmin</code></td><td>修改 <code>[Credentials]</code> 并重启</td></tr>
+            <tr><td>端口占用</td><td><code>netstat -ano | findstr :9000</code></td></tr>
+            <tr><td>mc 连接失败</td><td>先启动 MinIO，再运行 <code>minio-mc.bat</code></td></tr>
+          </tbody>
+        </table>
+        <p>更多细节见 <a href="minio/README.md">minio/README.md</a></p>
+      </section>
+
+      <section id="nanomq">
+        <h2>NanoMQ</h2>
+        <h3>配置说明（config.ini）</h3>
+        <table>
+          <thead><tr><th>段</th><th>键</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>NanoMQ</td><td><code>mqtt_port</code></td><td>MQTT TCP（默认 1883）</td></tr>
+            <tr><td>NanoMQ</td><td><code>http_port</code></td><td>本机 REST（默认 8082）</td></tr>
+            <tr><td>NanoMQ</td><td><code>ws_port</code></td><td>WebSocket（默认 8083）</td></tr>
+            <tr><td>TenantAPI</td><td><code>base_url</code></td><td>tenant-api 基址，auth 回调</td></tr>
+          </tbody>
+        </table>
+        <p>认证回调：<code>POST {base_url}/api/v1/mqtt/auth</code></p>
+
+        <h3>日常命令</h3>
+        <table>
+          <thead><tr><th>命令</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>start-nanomq.bat</code></td><td>渲染配置并 daemon 启动</td></tr>
+            <tr><td><code>stop-nanomq.bat</code></td><td><code>nanomq stop</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>与 tenant-api 对接</h3>
+        <pre><code>set YCWL_MQTT_BROKER_TYPE=nanomq
+set YCWL_MQTT_BROKER_URL=tcp://127.0.0.1:1883
+set YCWL_MQTT_SERVER_USERNAME=gouser
+set YCWL_MQTT_SERVER_PASSWORD=gouser@1234</code></pre>
+        <p>对外 MQTTS（nginx 四层代理）：<code>YCWL_MQTT_PUBLIC_BROKER_URL=ssl://&lt;公网主机&gt;:8883</code></p>
+        <p>更多细节见 <a href="nanomq/README.md">nanomq/README.md</a></p>
+      </section>
+
+      <section id="nginx">
+        <h2>Nginx</h2>
+        <h3>配置结构</h3>
+        <table>
+          <thead><tr><th>文件</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>conf/nginx.conf</code></td><td>主配置</td></tr>
+            <tr><td><code>conf/proxy/tenant.conf</code></td><td>租户入口 :8081</td></tr>
+            <tr><td><code>conf/proxy/minio.conf</code></td><td>MinIO 独立 HTTPS :9002 / :9003</td></tr>
+            <tr><td><code>conf/stream.conf</code></td><td>MQTTS :8883、WSS :8084</td></tr>
+          </tbody>
+        </table>
+
+        <h3>:8081 路径对照</h3>
+        <table>
+          <thead><tr><th>路径</th><th>反代目标</th></tr></thead>
+          <tbody>
+            <tr><td><code>/</code></td><td>tenant-web :2001</td></tr>
+            <tr><td><code>/api/</code></td><td>tenant-api :8443</td></tr>
+            <tr><td><code>/files/</code></td><td>tenant-api 素材代理</td></tr>
+            <tr><td><code>/minio-api/</code></td><td>MinIO API :9000</td></tr>
+            <tr><td><code>/minio-console/</code></td><td>MinIO Console :9001</td></tr>
+          </tbody>
+        </table>
+
+        <h3>日常命令</h3>
+        <table>
+          <thead><tr><th>命令</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>start-nginx.bat</code></td><td>启动</td></tr>
+            <tr><td><code>stop-nginx.bat</code></td><td>停止</td></tr>
+            <tr><td><code>reload-nginx.bat</code></td><td>测试配置后 reload</td></tr>
+          </tbody>
+        </table>
+
+        <h3>启动后本机地址</h3>
+        <ul>
+          <li>租户入口：<code>https://127.0.0.1:8081/</code></li>
+          <li>MinIO API：<code>https://127.0.0.1:9002/</code></li>
+          <li>MinIO Console：<code>https://127.0.0.1:9003/</code></li>
+          <li>平台后台：<code>https://127.0.0.1:8080/</code></li>
+        </ul>
+
+        <h3>常见问题</h3>
+        <table>
+          <thead><tr><th>现象</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>TLS 监听失败</td><td>检查 <code>conf/ssl/</code> 证书</td></tr>
+            <tr><td>502 / 空白页</td><td>确认 tenant-api :8443、tenant-web :2001 已启动</td></tr>
+            <tr><td>MinIO 路径 502</td><td>确认 MinIO :9000/:9001 已启动</td></tr>
+            <tr><td>外网无法访问</td><td>开放防火墙 80、8081、8084、8883、9002、9003</td></tr>
+          </tbody>
+        </table>
+        <p>日志：<code>nginx/logs/error.log</code>、<code>access.log</code></p>
+      </section>
+
+      <section id="ops">
+        <h2>日常运维速查</h2>
+        <h3>启动顺序</h3>
+        <p>PostgreSQL → init-db（仅首装）→ MinIO → tenant-api → tenant-web → NanoMQ → Nginx</p>
+        <h3>停止顺序</h3>
+        <p>Nginx → NanoMQ → tenant-web / tenant-api → MinIO → PostgreSQL</p>
+        <h3>日志位置</h3>
+        <table>
+          <thead><tr><th>组件</th><th>路径</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td><code>postgresql/log/postgresql.log</code></td></tr>
+            <tr><td>MinIO</td><td>启动窗口输出</td></tr>
+            <tr><td>NanoMQ</td><td><code>nanomq/log/</code></td></tr>
+            <tr><td>Nginx</td><td><code>nginx/logs/error.log</code>、<code>access.log</code></td></tr>
+          </tbody>
+        </table>
+        <h3>配置变更后动作</h3>
+        <table>
+          <thead><tr><th>组件</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td>PostgreSQL</td><td><code>pg_ctl reload</code> 或重启</td></tr>
+            <tr><td>MinIO</td><td><code>stop-minio.bat</code> + <code>start-minio.bat</code></td></tr>
+            <tr><td>NanoMQ</td><td><code>stop-nanomq.bat</code> + <code>start-nanomq.bat</code></td></tr>
+            <tr><td>Nginx</td><td><code>reload-nginx.bat</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="security">
+        <h2>安全与生产建议</h2>
+        <ol>
+          <li><strong>修改所有默认密码</strong>：PostgreSQL 应用用户、MinIO root、Hub <code>gouser</code>、<code>YCWL_JWT_SECRET</code>。</li>
+          <li><strong>监听地址</strong>：默认 <code>127.0.0.1</code>；局域网访问改 <code>listen_bind=0.0.0.0</code> 并限制防火墙。</li>
+          <li><strong>TLS</strong>：替换开发证书；设备 MQTTS 使用正式 CA。</li>
+          <li><strong>对外 URL 一致</strong>：<code>SERVER_PUBLIC_URL</code>、<code>YCWL_NGINX_PUBLIC_URL</code> 与 nginx 实际地址一致。</li>
+          <li><strong>数据备份</strong>：定期备份 <code>postgresql/data</code>、<code>minio/data</code>、License 与配置。</li>
+          <li><strong>管理员权限</strong>：MinIO 窗口模式勿误关窗口导致服务停止。</li>
+        </ol>
+      </section>
+
+      <section id="refs">
+        <h2>相关文档</h2>
+        <table>
+          <thead><tr><th>文档</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><a href="../README.md">deploy/README.md</a></td><td>Compose、tenant-api 打包与整体部署</td></tr>
+            <tr><td><a href="../../docs/部署指南-v1.0.0.md">部署指南-v1.0.0.md</a></td><td>数据库迁移与发布流程</td></tr>
+            <tr><td><a href="../../docs/对象存储-MinIO与本地配置指南.md">对象存储指南</a></td><td>MinIO、/files/ 代理</td></tr>
+            <tr><td><a href="../../docs/NanoMQ接入与HTTP认证配置指南.md">NanoMQ 接入指南</a></td><td>HTTP 认证详解</td></tr>
+            <tr><td><a href="postgresql/README.md">postgresql/README.md</a></td><td>PostgreSQL 补充</td></tr>
+            <tr><td><a href="minio/README.md">minio/README.md</a></td><td>MinIO 补充</td></tr>
+            <tr><td><a href="nanomq/README.md">nanomq/README.md</a></td><td>NanoMQ 补充</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="linux">
+        <h2>Linux 说明</h2>
+        <p>本目录脚本面向 <strong>Windows</strong>。Linux 裸机请使用 <code>scripts/service-postgres.sh</code>、<code>service-minio.sh</code>、<code>service-nanomq.sh</code>、<code>service-nginx.sh</code>；nginx 便携启动可参考 <code>nginx/start-nginx.sh</code>。</p>
+      </section>
+
+      <hr>
+      <p class="lead"><span class="badge">YCWL FreeTV</span> &nbsp; 文档与 <a href="README.md">README.md</a> 同步 · 双击本 HTML 文件即可在浏览器中打开</p>
+    </main>
+  </div>
+</body>
+</html>
