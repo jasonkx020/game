@@ -3,9 +3,11 @@ import { signRequest } from './signature'
 
 export interface LoginResult {
   accessToken: string
+  refreshToken: string
   userId: number
   nickname: string
   role: string
+  expiresIn?: number
 }
 
 export interface UserProfile {
@@ -94,6 +96,7 @@ export interface ApiError {
 
 export class ApiClient {
   private token = ''
+  private refresh = ''
   private cfg: ClientConfig
 
   constructor(cfg: Partial<ClientConfig> = {}) {
@@ -104,27 +107,203 @@ export class ApiClient {
     return this.token
   }
 
+  get refreshToken(): string {
+    return this.refresh
+  }
+
   setAccessToken(token: string): void {
     this.token = token
   }
 
-  clearAccessToken(): void {
-    this.token = ''
+  setTokens(access: string, refresh: string): void {
+    this.token = access
+    this.refresh = refresh
   }
 
-  async login(phone: string, smsCode: string): Promise<LoginResult> {
-    const res = await this.post<{
+  clearAccessToken(): void {
+    this.token = ''
+    this.refresh = ''
+  }
+
+  async sendCode(params: {
+    channel: 'phone' | 'email'
+    target: string
+    purpose: 'register' | 'login'
+  }): Promise<void> {
+    await this.authPost('/v1/auth/send-code', params)
+  }
+
+  async register(params: {
+    channel: 'phone' | 'email'
+    target: string
+    code: string
+    nickname?: string
+  }): Promise<LoginResult> {
+    const res = await this.authPost<{
       access_token: string
+      refresh_token: string
       user_id: number
       nickname: string
       role: string
-    }>('/v1/auth/login', { phone, sms_code: smsCode })
+      expires_in?: number
+    }>('/v1/auth/register', {
+      channel: params.channel,
+      target: params.target,
+      code: params.code,
+      ...(params.nickname ? { nickname: params.nickname } : {}),
+    })
+    return this.applyTokenPair(res)
+  }
+
+  async login(phone: string, smsCode: string): Promise<LoginResult> {
+    return this.loginWithCode({ channel: 'phone', target: phone, code: smsCode })
+  }
+
+  async loginWithCode(params: {
+    channel: 'phone' | 'email'
+    target: string
+    code: string
+  }): Promise<LoginResult> {
+    const body =
+      params.channel === 'phone'
+        ? { channel: 'phone', phone: params.target, sms_code: params.code, code: params.code }
+        : { channel: 'email', email: params.target, code: params.code }
+    const res = await this.authPost<{
+      access_token: string
+      refresh_token: string
+      user_id: number
+      nickname: string
+      role: string
+      expires_in?: number
+    }>('/v1/auth/login', body)
+    return this.applyTokenPair(res)
+  }
+
+  /** platform: client-detected `web` | `miniprogram` */
+  async loginWeChat(platform: 'web' | 'miniprogram', code: string): Promise<LoginResult> {
+    const res = await this.authPost<{
+      access_token: string
+      refresh_token: string
+      user_id: number
+      nickname: string
+      role: string
+      expires_in?: number
+    }>('/v1/auth/oauth/wechat', { platform, code })
+    return this.applyTokenPair(res)
+  }
+
+  async getAuthMe(): Promise<{
+    accountId: number
+    nickname: string
+    phone?: string
+    email?: string
+    avatarUrl?: string
+    realnameStatus: string
+    realNameMasked?: string
+    idCardMasked?: string
+    isMinor: boolean
+  }> {
+    const res = await this.authGet<{
+      account_id: number
+      nickname: string
+      phone?: string
+      email?: string
+      avatar_url?: string
+      realname_status: string
+      real_name_masked?: string
+      id_card_masked?: string
+      is_minor: boolean
+    }>('/v1/auth/me')
+    return {
+      accountId: res.account_id,
+      nickname: res.nickname,
+      phone: res.phone,
+      email: res.email,
+      avatarUrl: res.avatar_url,
+      realnameStatus: res.realname_status,
+      realNameMasked: res.real_name_masked,
+      idCardMasked: res.id_card_masked,
+      isMinor: res.is_minor,
+    }
+  }
+
+  async verifyRealName(realName: string, idCardNo: string): Promise<{
+    realnameStatus: string
+    realNameMasked?: string
+    idCardMasked?: string
+    isMinor: boolean
+  }> {
+    const res = await this.authPost<{
+      realname_status: string
+      real_name_masked?: string
+      id_card_masked?: string
+      is_minor: boolean
+    }>('/v1/auth/realname/verify', { real_name: realName, id_card_no: idCardNo })
+    return {
+      realnameStatus: res.realname_status,
+      realNameMasked: res.real_name_masked,
+      idCardMasked: res.id_card_masked,
+      isMinor: res.is_minor,
+    }
+  }
+
+  private applyTokenPair(res: {
+    access_token: string
+    refresh_token: string
+    user_id: number
+    nickname: string
+    role: string
+    expires_in?: number
+  }): LoginResult {
     this.token = res.access_token
+    this.refresh = res.refresh_token
     return {
       accessToken: res.access_token,
+      refreshToken: res.refresh_token,
       userId: res.user_id,
       nickname: res.nickname,
       role: res.role,
+      expiresIn: res.expires_in,
+    }
+  }
+
+  /**
+   * Dual-token refresh: must send current access (even if expired) + refresh.
+   * Rotates both tokens on success.
+   */
+  async refreshTokens(): Promise<LoginResult> {
+    if (!this.token || !this.refresh) {
+      throw { code: 1001, message: 'access_token and refresh_token required' } as ApiError
+    }
+    const res = await this.authPost<{
+      access_token: string
+      refresh_token: string
+      user_id: number
+      nickname: string
+      role: string
+      expires_in?: number
+    }>('/v1/auth/refresh', {
+      access_token: this.token,
+      refresh_token: this.refresh,
+    })
+    this.token = res.access_token
+    this.refresh = res.refresh_token
+    return {
+      accessToken: res.access_token,
+      refreshToken: res.refresh_token,
+      userId: res.user_id,
+      nickname: res.nickname,
+      role: res.role,
+      expiresIn: res.expires_in,
+    }
+  }
+
+  async logout(): Promise<void> {
+    if (!this.token) return
+    try {
+      await this.authPost('/v1/auth/logout', { access_token: this.token })
+    } finally {
+      this.clearAccessToken()
     }
   }
 
@@ -332,18 +511,31 @@ export class ApiClient {
   }
 
   private async put<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>('PUT', path, body)
+    return this.request<T>('PUT', path, body, this.cfg.apiBaseUrl)
   }
 
   private async get<T>(path: string): Promise<T> {
-    return this.request<T>('GET', path)
+    return this.request<T>('GET', path, undefined, this.cfg.apiBaseUrl)
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>('POST', path, body)
+    return this.request<T>('POST', path, body, this.cfg.apiBaseUrl)
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async authPost<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>('POST', path, body, this.cfg.authBaseUrl)
+  }
+
+  private async authGet<T>(path: string): Promise<T> {
+    return this.request<T>('GET', path, undefined, this.cfg.authBaseUrl)
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    baseUrl: string = this.cfg.apiBaseUrl,
+  ): Promise<T> {
     const bodyStr = body !== undefined ? JSON.stringify(body) : ''
     const headers = await signRequest({
       method,
@@ -353,7 +545,7 @@ export class ApiClient {
       appId: this.cfg.appId,
       appSecret: this.cfg.appSecret,
     })
-    const url = `${this.cfg.apiBaseUrl}${path}`
+    const url = `${baseUrl}${path}`
     const res = await fetch(url, {
       method,
       headers: {

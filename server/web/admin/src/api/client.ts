@@ -3,6 +3,7 @@ import { signRequest } from './signature'
 const appId = import.meta.env.VITE_APP_ID || 'cocos-dev'
 const appSecret = import.meta.env.VITE_HMAC_SECRET || 'dev-hmac-secret-change-me'
 const apiBase = import.meta.env.VITE_API_BASE || ''
+const authBase = import.meta.env.VITE_AUTH_BASE || 'http://localhost:8081'
 
 export interface ApiError {
   code: number
@@ -14,7 +15,8 @@ function getToken(): string | undefined {
   return localStorage.getItem('access_token') ?? undefined
 }
 
-export async function apiRequest<T>(
+async function request<T>(
+  base: string,
   method: string,
   path: string,
   body?: unknown,
@@ -30,7 +32,7 @@ export async function apiRequest<T>(
     appSecret,
   })
 
-  const res = await fetch(`${apiBase}${signPath}`, {
+  const res = await fetch(`${base}${signPath}`, {
     method,
     headers: {
       ...headers,
@@ -47,7 +49,13 @@ export async function apiRequest<T>(
 }
 
 export const api = {
-  get: <T>(path: string) => apiRequest<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => apiRequest<T>('POST', path, body),
-  delete: <T>(path: string) => apiRequest<T>('DELETE', path),
+  get: <T>(path: string) => request<T>(apiBase, 'GET', path),
+  post: <T>(path: string, body?: unknown) => request<T>(apiBase, 'POST', path, body),
+  delete: <T>(path: string) => request<T>(apiBase, 'DELETE', path),
+}
+
+/** Auth endpoints on independent auth-service */
+export const authApi = {
+  get: <T>(path: string) => request<T>(authBase, 'GET', path),
+  post: <T>(path: string, body?: unknown) => request<T>(authBase, 'POST', path, body),
 }

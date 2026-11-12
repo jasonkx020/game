@@ -4,6 +4,7 @@
 
 | 目录 | 职责 |
 | :--- | :--- |
+| [auth-service/](auth-service/) | 独立登录与 Token（auth-api :8081；双 Token refresh） |
 | [server/](server/) | Go 双进程（Gin platform-api + Pitaya game）、迁移、proto、运营后台、部署 |
 | [client/](client/) | Cocos Creator 3.8.8 游戏客户端 + Platform SDK |
 
@@ -33,8 +34,9 @@ Copy-Item server\.env.example server\.env
 .\scripts\dev.ps1 gen-proto
 
 # 5. 启动服务 — 任选其一：
-#    A) 两个终端
-.\scripts\dev.ps1 run-api    # :8080
+#    A) 三个终端
+.\scripts\dev.ps1 run-auth   # :8081 登录/刷新
+.\scripts\dev.ps1 run-api    # :8080 业务 API
 .\scripts\dev.ps1 run-game   # :3250 WS
 #    B) VS Code/Cursor：Run and Debug -> Server (api + game)
 
@@ -53,8 +55,9 @@ cp server/.env.example server/.env
 make up
 make seed-dev          # 在 server/ 执行 go run ./cmd/migrate up
 make gen-proto
-make run-api           # 终端 1
-make run-game          # 终端 2
+make run-auth          # 终端 1 — auth-api :8081
+make run-api           # 终端 2 — platform-api :8080
+make run-game          # 终端 3 — Pitaya :3250
 ```
 
 根目录 `make` 会转发到 `server/Makefile`；也可直接 `cd server && make ...`。

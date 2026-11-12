@@ -9,16 +9,18 @@ import (
 
 	"github.com/example/game/internal/config"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
+	"github.com/example/game/internal/platform/player"
 	"github.com/example/game/internal/platform/user"
 )
 
 type Handler struct {
 	component.Base
-	cfg *config.Config
+	cfg     *config.Config
+	players *player.Service
 }
 
-func New(cfg *config.Config) *Handler {
-	return &Handler{cfg: cfg}
+func New(cfg *config.Config, players *player.Service) *Handler {
+	return &Handler{cfg: cfg, players: players}
 }
 
 func (h *Handler) Entry(ctx context.Context, req *pb.EntryReq) (*pb.EntryRsp, error) {
@@ -26,17 +28,21 @@ func (h *Handler) Entry(ctx context.Context, req *pb.EntryReq) (*pb.EntryRsp, er
 }
 
 func (h *Handler) Bind(ctx context.Context, req *pb.BindReq) (*pb.BindRsp, error) {
-	typ, err := user.ParsePrincipalType(req.AccessToken, []byte(h.cfg.JWTSecret))
-	if err != nil || typ != user.PrincipalTypePlayer {
+	claims, err := user.ParseAccessClaims(req.AccessToken, []byte(h.cfg.JWTSecret))
+	if err != nil || claims.PrincipalType != user.PrincipalTypePlayer {
 		return nil, pitaya.Error(err, "AUTH")
 	}
-	uid, err := user.ParseUserID(req.AccessToken, []byte(h.cfg.JWTSecret))
+	p, err := h.players.EnsureFromAuth(ctx, claims.AccountID, claims.Phone, claims.Nickname)
 	if err != nil {
 		return nil, pitaya.Error(err, "AUTH")
 	}
 	s := pitaya.GetSessionFromCtx(ctx)
-	if err := s.Bind(ctx, strconv.FormatInt(uid, 10)); err != nil {
+	if err := s.Bind(ctx, strconv.FormatInt(p.ID, 10)); err != nil {
 		return nil, err
 	}
-	return &pb.BindRsp{UserId: uint64(uid), Nickname: "player" + strconv.FormatInt(uid, 10)}, nil
+	nick := p.Nickname
+	if nick == "" {
+		nick = "player" + strconv.FormatInt(p.ID, 10)
+	}
+	return &pb.BindRsp{UserId: uint64(p.ID), Nickname: nick}, nil
 }

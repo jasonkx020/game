@@ -1,10 +1,82 @@
+/v1/auth/send-code:
+  post:
+    tags: [Auth]
+    summary: 发送手机/邮箱验证码
+    operationId: authSendCode
+    servers:
+      - url: http://localhost:8081
+    security:
+      - signatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [channel, target, purpose]
+            properties:
+              channel:
+                type: string
+                enum: [phone, email]
+              target:
+                type: string
+              purpose:
+                type: string
+                enum: [register, login]
+    responses:
+      '200':
+        description: 已接受（Dev 码见服务日志 / DEV_*_CODE）
+      '409':
+        description: 注册用途且目标已存在
+
+/v1/auth/register:
+  post:
+    tags: [Auth]
+    summary: 手机或邮箱验证码注册
+    operationId: authRegister
+    servers:
+      - url: http://localhost:8081
+    security:
+      - signatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [channel, target, code]
+            properties:
+              channel:
+                type: string
+                enum: [phone, email]
+              target:
+                type: string
+              code:
+                type: string
+              nickname:
+                type: string
+    responses:
+      '200':
+        description: 注册成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/LoginResponse'
+      '409':
+        description: 已注册
+
 /v1/auth/login:
   post:
     tags:
       - Auth
-    summary: 游戏玩家短信验证码登录
+    summary: 已有账号登录（phone/email + 验证码）
     operationId: authLogin
-    description: 仅注册/登录游戏玩家（players 表）。无需 Bearer Token，但必须携带 HMAC 签名 Header（见 http-signature.md）
+    description: |
+      auth-service（`:8081`）。不再隐式建号；需先 register 或微信自动建号。
+      兼容字段：`phone`+`sms_code` 或 `email`+`code`。
+    servers:
+      - url: http://localhost:8081
+        description: auth-service
     security:
       - signatureAuth: []
     parameters:
@@ -26,18 +98,92 @@
           application/json:
             schema:
               $ref: '../components/schemas.yaml#/LoginResponse'
-      '400':
-        $ref: '../components/responses.yaml#/BadRequest'
       '401':
         $ref: '../components/responses.yaml#/SignatureInvalid'
+
+/v1/auth/oauth/wechat:
+  post:
+    tags: [Auth]
+    summary: 微信登录（web / 小程序自适应）
+    operationId: authWeChat
+    servers:
+      - url: http://localhost:8081
+    security:
+      - signatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [platform, code]
+            properties:
+              platform:
+                type: string
+                enum: [web, miniprogram]
+              code:
+                type: string
+    responses:
+      '200':
+        description: 登录或自动注册成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/LoginResponse'
+
+/v1/auth/me:
+  get:
+    tags: [Auth]
+    summary: 当前账号基础资料
+    operationId: authMe
+    servers:
+      - url: http://localhost:8081
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    responses:
+      '200':
+        description: 基础资料（含实名状态，无明文证件号）
+
+/v1/auth/realname/verify:
+  post:
+    tags: [Auth]
+    summary: 阿里云二要素实名核验
+    operationId: authRealnameVerify
+    servers:
+      - url: http://localhost:8081
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [real_name, id_card_no]
+            properties:
+              real_name:
+                type: string
+              id_card_no:
+                type: string
+    responses:
+      '200':
+        description: 核验一致
+      '403':
+        description: 核验不一致
 
 /v1/auth/refresh:
   post:
     tags:
       - Auth
-    summary: 刷新 access_token
+    summary: 双 Token 刷新 access + refresh（auth-service）
     operationId: authRefresh
-    description: Authorization 为空串参与签名；无需有效 Bearer
+    description: |
+      Body 必须同时携带 `access_token`（可过期但须验签合法）与 `refresh_token`（合法且未过期）。
+    servers:
+      - url: http://localhost:8081
+        description: auth-service
     security:
       - signatureAuth: []
     parameters:

@@ -1,4 +1,4 @@
-.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto tidy test run-api run-game run-admin build-linux docker-build docker-up-prod
+.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto tidy test run-api run-auth run-game run-admin build-linux docker-build docker-up-prod
 
 GOOS_LINUX ?= linux
 GOARCH ?= amd64
@@ -8,6 +8,7 @@ MIGRATE_DB ?= $(if $(MIGRATE_DATABASE_URL),$(MIGRATE_DATABASE_URL),$(DATABASE_UR
 COMPOSE := docker compose -f deploy/docker-compose.yml
 COMPOSE_PROD := docker compose -f deploy/docker-compose.prod.yml
 CLIENT_DIR := ../client
+AUTH_DIR := ../auth-service
 
 up:
 	$(COMPOSE) up -d
@@ -48,6 +49,9 @@ test:
 
 run-api:
 	go run ./cmd/platform-api
+
+run-auth:
+	cd $(AUTH_DIR) && go run ./cmd/migrate -path migrations && go run ./cmd/auth-api
 
 run-game:
 	go run ./cmd/game

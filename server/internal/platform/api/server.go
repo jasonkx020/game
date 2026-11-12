@@ -75,11 +75,7 @@ func (s *Server) Register(r *gin.Engine) {
 	v1 := r.Group("/v1")
 	v1.Use(sig)
 	{
-		v1.POST("/auth/login", s.login)
-		v1.POST("/auth/refresh", httpmw.JWT(s.cfg.JWTSecret), jwtPlayer, s.refresh)
-
-		v1.POST("/admin/auth/login", s.adminLogin)
-		v1.POST("/admin/auth/refresh", httpmw.JWT(s.cfg.JWTSecret), jwtAdmin, s.adminRefresh)
+		// Auth login/refresh/logout 由独立 auth-service 提供（默认 :8081）
 
 		clubRead := v1.Group("")
 		clubRead.Use(httpmw.JWT(s.cfg.JWTSecret))
@@ -152,14 +148,36 @@ func (s *Server) Register(r *gin.Engine) {
 }
 
 func (s *Server) playerID(c *gin.Context) (int64, error) {
-	return s.principalID(c)
+	claims, err := s.accessClaims(c)
+	if err != nil {
+		return 0, err
+	}
+	p, err := s.players.EnsureFromAuth(c.Request.Context(), claims.AccountID, claims.Phone, claims.Nickname)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "player link failed", "request_id": c.GetString("request_id")})
+		return 0, err
+	}
+	c.Set("user_id", strconv.FormatInt(p.ID, 10))
+	c.Set("auth_account_id", strconv.FormatInt(claims.AccountID, 10))
+	return p.ID, nil
 }
 
 func (s *Server) adminID(c *gin.Context) (int64, error) {
-	return s.principalID(c)
+	claims, err := s.accessClaims(c)
+	if err != nil {
+		return 0, err
+	}
+	u, err := s.admins.EnsureFromAuth(c.Request.Context(), claims.AccountID, claims.Phone, claims.Nickname, claims.Role)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "admin link failed", "request_id": c.GetString("request_id")})
+		return 0, err
+	}
+	c.Set("user_id", strconv.FormatInt(u.ID, 10))
+	c.Set("auth_account_id", strconv.FormatInt(claims.AccountID, 10))
+	return u.ID, nil
 }
 
-func (s *Server) principalID(c *gin.Context) (int64, error) {
+func (s *Server) accessClaims(c *gin.Context) (*user.AccessClaims, error) {
 	token := c.GetString("access_token")
 	if token == "" {
 		auth := c.GetHeader("Authorization")
@@ -167,13 +185,12 @@ func (s *Server) principalID(c *gin.Context) (int64, error) {
 			token = auth[7:]
 		}
 	}
-	uid, err := user.ParseUserID(token, []byte(s.cfg.JWTSecret))
+	claims, err := user.ParseAccessClaims(token, []byte(s.cfg.JWTSecret))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
-		return 0, err
+		return nil, err
 	}
-	c.Set("user_id", strconv.FormatInt(uid, 10))
-	return uid, nil
+	return claims, nil
 }
 
 func parseClubID(c *gin.Context) (int64, error) {

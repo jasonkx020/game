@@ -18,16 +18,48 @@ const (
 	PrincipalTypePlayer = "player"
 )
 
+type AccessClaims struct {
+	AccountID     int64
+	Role          string
+	PrincipalType string
+	Phone         string
+	Nickname      string
+}
+
 func ParseUserID(tokenStr string, secret []byte) (int64, error) {
-	claims, err := parseClaims(tokenStr, secret)
+	claims, err := ParseAccessClaims(tokenStr, secret)
 	if err != nil {
 		return 0, err
 	}
-	sub, ok := claims["sub"].(float64)
-	if !ok {
-		return 0, errors.New("invalid sub")
+	return claims.AccountID, nil
+}
+
+func ParseAccessClaims(tokenStr string, secret []byte) (*AccessClaims, error) {
+	raw, err := parseClaims(tokenStr, secret)
+	if err != nil {
+		return nil, err
 	}
-	return int64(sub), nil
+	sub, ok := raw["sub"].(float64)
+	if !ok {
+		return nil, errors.New("invalid sub")
+	}
+	role, _ := raw["role"].(string)
+	typ, _ := raw["typ"].(string)
+	phone, _ := raw["phone"].(string)
+	nickname, _ := raw["nickname"].(string)
+	if typ == "" {
+		typ = PrincipalTypePlayer
+	}
+	if role == "" {
+		role = RolePlayer
+	}
+	return &AccessClaims{
+		AccountID:     int64(sub),
+		Role:          role,
+		PrincipalType: typ,
+		Phone:         phone,
+		Nickname:      nickname,
+	}, nil
 }
 
 func ParseRole(tokenStr string, secret []byte) (string, error) {

@@ -6,20 +6,20 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/example/game/internal/platform/user"
 )
 
 type AdminUser struct {
-	ID          int64      `db:"id"`
-	Phone       string     `db:"phone"`
-	Nickname    string     `db:"nickname"`
-	Role        string     `db:"role"`
-	AvatarURL   string     `db:"avatar_url"`
-	Status      string     `db:"status"`
-	LastLoginAt *time.Time `db:"last_login_at"`
+	ID            int64      `db:"id"`
+	AuthAccountID *int64     `db:"auth_account_id"`
+	Phone         string     `db:"phone"`
+	Nickname      string     `db:"nickname"`
+	Role          string     `db:"role"`
+	AvatarURL     string     `db:"avatar_url"`
+	Status        string     `db:"status"`
+	LastLoginAt   *time.Time `db:"last_login_at"`
 }
 
 type Service struct {
@@ -32,42 +32,40 @@ func NewService(db *sqlx.DB, jwtSecret, devCode string) *Service {
 	return &Service{db: db, jwtSecret: []byte(jwtSecret), devCode: devCode}
 }
 
-func (s *Service) Login(ctx context.Context, phone, smsCode string) (*AdminUser, string, error) {
-	if smsCode != s.devCode {
-		return nil, "", user.ErrInvalidSMS
+// EnsureFromAuth links a local admin_users row to an auth-service account (must already exist by phone).
+func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, nickname, role string) (*AdminUser, error) {
+	if accountID <= 0 {
+		return nil, errors.New("invalid account id")
 	}
 	var u AdminUser
 	err := s.db.GetContext(ctx, &u,
-		`SELECT id, phone, nickname, role, avatar_url, status, last_login_at
-		 FROM admin_users WHERE phone=$1 AND status='active'`, phone)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, "", user.ErrInvalidSMS
+		`SELECT id, auth_account_id, phone, nickname, role, avatar_url, status, last_login_at
+		 FROM admin_users WHERE auth_account_id=$1`, accountID)
+	if err == nil {
+		return &u, nil
 	}
-	if err != nil {
-		return nil, "", err
+	if phone != "" {
+		err = s.db.GetContext(ctx, &u,
+			`SELECT id, auth_account_id, phone, nickname, role, avatar_url, status, last_login_at
+			 FROM admin_users WHERE phone=$1 AND status='active'`, phone)
+		if err == nil {
+			_, _ = s.db.ExecContext(ctx,
+				`UPDATE admin_users SET auth_account_id=$1, last_login_at=$2, updated_at=$2 WHERE id=$3`,
+				accountID, time.Now(), u.ID)
+			u.AuthAccountID = &accountID
+			return &u, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
 	}
-	_, _ = s.db.ExecContext(ctx,
-		`UPDATE admin_users SET last_login_at=$1, updated_at=$1 WHERE id=$2`, time.Now(), u.ID)
-
-	token, err := s.issueToken(u.ID, u.Role)
-	if err != nil {
-		return nil, "", err
-	}
-	return &u, token, nil
-}
-
-func (s *Service) Refresh(ctx context.Context, adminID int64) (string, error) {
-	u, err := s.GetByID(ctx, adminID)
-	if err != nil {
-		return "", err
-	}
-	return s.issueToken(u.ID, u.Role)
+	return nil, sql.ErrNoRows
 }
 
 func (s *Service) GetByID(ctx context.Context, adminID int64) (*AdminUser, error) {
 	var u AdminUser
 	if err := s.db.GetContext(ctx, &u,
-		`SELECT id, phone, nickname, role, avatar_url, status, last_login_at
+		`SELECT id, auth_account_id, phone, nickname, role, avatar_url, status, last_login_at
 		 FROM admin_users WHERE id=$1`, adminID); err != nil {
 		return nil, err
 	}
@@ -133,16 +131,4 @@ func (s *Service) ListAdmin(ctx context.Context, page, pageSize int) ([]AdminUse
 		}
 	}
 	return out, total, nil
-}
-
-func (s *Service) issueToken(adminID int64, role string) (string, error) {
-	claims := jwt.MapClaims{
-		"sub":  adminID,
-		"role": role,
-		"typ":  user.PrincipalTypeAdmin,
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
-		"iat":  time.Now().Unix(),
-	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString(s.jwtSecret)
 }

@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_ID: string
   readonly VITE_HMAC_SECRET: string
   readonly VITE_API_BASE: string
+  readonly VITE_AUTH_BASE: string
 }
 
 interface ImportMeta {

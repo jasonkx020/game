@@ -13,7 +13,7 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet(
         'help', 'up', 'down', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
-        'run-api', 'run-game', 'run-admin', 'test', 'tidy',
+        'run-api', 'run-auth', 'run-game', 'run-admin', 'test', 'tidy',
         'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build', 'serve-bundles'
     )]
     [string]$Command = 'help',
@@ -23,6 +23,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Server = Join-Path $Root 'server'
+$Auth = Join-Path $Root 'auth-service'
 $Client = Join-Path $Root 'client'
 
 function Import-DotEnv {
@@ -131,6 +132,7 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 seed-dev        同 migrate（升级 + 种子已在迁移中）
   .\scripts\dev.ps1 migrate-docker  在 Docker 内执行（可选，需 Docker）
   .\scripts\dev.ps1 run-api         启动 platform-api (:8080)
+  .\scripts\dev.ps1 run-auth        启动 auth-api (:8081) 并应用 auth migrations
   .\scripts\dev.ps1 run-game        启动 Pitaya game (:3250)
   .\scripts\dev.ps1 run-admin       启动运营后台 (:5173)
   .\scripts\dev.ps1 test            go test ./...（server/）
@@ -166,6 +168,25 @@ switch ($Command) {
     'run-api' {
         Push-Location $Server
         try { go run ./cmd/platform-api } finally { Pop-Location }
+    }
+    'run-auth' {
+        Import-DotEnv
+        # Prefer auth-service/.env; fall back to server/.env already loaded
+        $authEnv = Join-Path $Auth '.env'
+        if (Test-Path $authEnv) {
+            Get-Content $authEnv | ForEach-Object {
+                $line = $_.Trim()
+                if ($line -eq '' -or $line.StartsWith('#')) { return }
+                $idx = $line.IndexOf('=')
+                if ($idx -lt 1) { return }
+                Set-Item -Path ("Env:" + $line.Substring(0, $idx).Trim()) -Value $line.Substring($idx + 1).Trim()
+            }
+        }
+        Push-Location $Auth
+        try {
+            go run ./cmd/migrate -path migrations
+            go run ./cmd/auth-api
+        } finally { Pop-Location }
     }
     'run-game' {
         Push-Location $Server

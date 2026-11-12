@@ -9,6 +9,7 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 
 | 组件 | 路径 | 端口 |
 | :--- | :--- | :--- |
+| Auth | `auth-service/cmd/auth-api` | :8081 |
 | HTTP 平台 | `server/cmd/platform-api` | :8080 |
 | Pitaya 游戏 | `server/cmd/game` | :3250 WS |
 | 运营后台 | `server/web/admin/` | :5173 |
@@ -49,9 +50,10 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 .\scripts\dev.ps1 up          # Postgres + Redis
 .\scripts\dev.ps1 seed-dev    # 迁移 + 种子
 .\scripts\dev.ps1 gen-proto   # Go proto
+.\scripts\dev.ps1 run-auth    # :8081
 .\scripts\dev.ps1 run-api     # :8080
 .\scripts\dev.ps1 run-game    # :3250
-.\scripts\dev.ps1 run-admin   # :5173（需先 run-api）
+.\scripts\dev.ps1 run-admin   # :5173（需先 run-auth + run-api）
 .\scripts\dev.ps1 test        # go test ./...
 ```
 
@@ -60,8 +62,9 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 ```bash
 make up && make seed-dev
 make gen-proto
-make run-api    # 终端 1
-make run-game   # 终端 2
+make run-auth   # 终端 1
+make run-api    # 终端 2
+make run-game   # 终端 3
 make test
 ```
 

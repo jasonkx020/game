@@ -23,6 +23,7 @@ import (
 	roomh "github.com/example/game/internal/pitaya/handlers/room"
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/platform/actionlog"
+	"github.com/example/game/internal/platform/player"
 	iredis "github.com/example/game/internal/redis"
 )
 
@@ -52,6 +53,7 @@ func main() {
 
 	gen := audit.NewGenerator(cfg.SnowflakeWorkerID)
 	logRepo := actionlog.NewRepo(sqlDB)
+	players := player.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
 	store := runtime.NewStore()
 	committer := &commit.Committer{Log: logRepo, Audit: gen}
 
@@ -67,7 +69,7 @@ func main() {
 
 	// Client routes use lowercase methods (game.connector.entry); Pitaya defaults to Entry.
 	nameOpts := []component.Option{component.WithNameFunc(strings.ToLower)}
-	pitaya.Register(connector.New(cfg), append([]component.Option{component.WithName("connector")}, nameOpts...)...)
+	pitaya.Register(connector.New(cfg, players), append([]component.Option{component.WithName("connector")}, nameOpts...)...)
 	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB), append([]component.Option{component.WithName("room")}, nameOpts...)...)
 	pitaya.Register(dawugui.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("dawugui")}, nameOpts...)...)
 	pitaya.Register(liuzichong.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("liuzichong")}, nameOpts...)...)

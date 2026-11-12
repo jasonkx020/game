@@ -38,6 +38,42 @@ services:
       postgres:
         condition: service_healthy
 
+  auth-migrate:
+    image: migrate/migrate
+    volumes:
+      - ../../auth-service/migrations:/migrations
+    command:
+      - -path=/migrations
+      - -database=postgres://game:${POSTGRES_PASSWORD:-game}@postgres:5432/game?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auth-api:
+    image: game-auth-api:latest
+    build:
+      context: ../../auth-service
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://game:${POSTGRES_PASSWORD:-game}@postgres:5432/game?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      HMAC_SECRET: ${HMAC_SECRET}
+      APP_ID: ${APP_ID:-cocos-dev}
+      AUTH_HTTP_PORT: "8081"
+      ADMIN_DEV_PHONE: ${ADMIN_DEV_PHONE:-13800000000}
+      GIN_MODE: release
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    ports:
+      - "${AUTH_HTTP_PORT:-8081}:8081"
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   platform-api:
     image: game-platform-api:latest
     build:
@@ -59,6 +95,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      auth-api:
+        condition: service_started
       redis:
         condition: service_healthy
     restart: unless-stopped

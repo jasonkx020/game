@@ -89,7 +89,7 @@ openapi-generator-cli generate -i openapi.yaml -g typescript-fetch -o ../../../c
 
 | 文件 | 路径 |
 | :--- | :--- |
-| auth.yaml | POST `/v1/auth/login`, POST `/v1/auth/refresh` |
+| auth.yaml | send-code / register / login / oauth/wechat / realname / me / refresh（**auth-service :8081**） |
 | user.yaml | GET `/v1/user/profile` |
 | wallet.yaml | GET `/v1/wallet/room-card`, GET `/v1/wallet/game-coin/{game_id}` |
 | room.yaml | POST `/v1/rooms`, GET `/v1/rooms/{room_id}`, POST `/v1/rooms/{room_id}/join` |

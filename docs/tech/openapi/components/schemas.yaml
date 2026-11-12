@@ -112,10 +112,15 @@ LoginResponse:
 RefreshRequest:
   type: object
   required:
+    - access_token
     - refresh_token
   properties:
+    access_token:
+      type: string
+      description: 当前 access JWT；即使已过期也必须上传（服务端验签并忽略 exp）
     refresh_token:
       type: string
+      description: opaque refresh；须与 access.sub 主体一致且未过期
 
 UserProfile:
   type: object
