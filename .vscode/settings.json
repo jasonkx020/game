@@ -1,0 +1,7 @@
+{
+  "go.workingDir": "${workspaceFolder}/server",
+  "go.goroot": "",
+  "go.toolsEnvVars": {
+    "GOFLAGS": "-mod=mod"
+  }
+}

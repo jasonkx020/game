@@ -1,7 +1,7 @@
 version: v2
 plugins:
   - remote: buf.build/community/stephenh-ts-proto
-    out: ../client/assets/platform/generated/pitaya
+    out: ../../client/assets/platform/generated/pitaya
     opt:
       - esModuleInterop=true
       - outputServices=none

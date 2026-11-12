@@ -39,4 +39,4 @@
 ## 相关
 
 - [game-host-sdk.md](../game-host-sdk.md)
-- [games-lobby/README.md](../../../games-lobby/README.md)
+- [games-lobby-migration.md](../games-lobby-migration.md)

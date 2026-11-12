@@ -1,13 +1,18 @@
 # 打乌龟游戏平台 — 本地开发
 
-Go 双进程：**Gin platform-api** + **Pitaya game**；P1 运营后台 + **Cocos 客户端 SDK**。
+仓库按 **server / client** 分目录管理：
+
+| 目录 | 职责 |
+| :--- | :--- |
+| [server/](server/) | Go 双进程（Gin platform-api + Pitaya game）、迁移、proto、运营后台、部署 |
+| [client/](client/) | Cocos Creator 3.8.8 游戏客户端 + Platform SDK |
 
 - **本地开发**：Windows / macOS / Linux 均可（Go 源码跨平台）
-- **生产部署**：Linux（`bin/` 交叉编译或 `deploy/Dockerfile` 镜像）
+- **生产部署**：Linux（`server/bin/` 交叉编译或 `server/deploy/Dockerfile` 镜像）
 
 ## 前置
 
-- Go 1.22+（含数据库迁移：`go run ./cmd/migrate`，无需单独安装 migrate CLI）
+- Go 1.22+（含数据库迁移：`go run ./cmd/migrate`，在 `server/` 下执行）
 - Node.js 18+（运营后台、客户端 Vitest）
 - Cocos Creator 3.8.8（运行游戏客户端场景）
 - Docker Desktop（可选：本地 Postgres + Redis；`dev.ps1 up`）
@@ -15,13 +20,13 @@ Go 双进程：**Gin platform-api** + **Pitaya game**；P1 运营后台 + **Coco
 ## Windows 快速启动
 
 ```powershell
-# 1. 环境变量
-Copy-Item .env.example .env
+# 1. 环境变量（放在 server/）
+Copy-Item server\.env.example server\.env
 
 # 2. 基础设施
 .\scripts\dev.ps1 up
 
-# 3. 数据库迁移 + 种子（使用 .env 中的 DATABASE_URL）
+# 3. 数据库迁移 + 种子（使用 server/.env 中的 DATABASE_URL）
 .\scripts\dev.ps1 seed-dev
 
 # 4. 生成 proto（需 buf）
@@ -34,7 +39,7 @@ Copy-Item .env.example .env
 #    B) VS Code/Cursor：Run and Debug -> Server (api + game)
 
 # 6. 运营后台（可选）
-cd web/admin; npm install; cd ../..
+cd server\web\admin; npm install; cd ..\..\..
 .\scripts\dev.ps1 run-admin  # :5173
 
 # 7. 游戏 Bundle 静态服务（可选，按需下载）
@@ -44,15 +49,15 @@ cd web/admin; npm install; cd ../..
 ## Linux / macOS 快速启动
 
 ```bash
-cp .env.example .env
+cp server/.env.example server/.env
 make up
-make seed-dev          # go run ./cmd/migrate up
+make seed-dev          # 在 server/ 执行 go run ./cmd/migrate up
 make gen-proto
 make run-api           # 终端 1
 make run-game          # 终端 2
 ```
 
-Linux/macOS 与 Windows 使用同一迁移入口：`go run ./cmd/migrate`。
+根目录 `make` 会转发到 `server/Makefile`；也可直接 `cd server && make ...`。
 
 ### 数据库迁移
 
@@ -63,20 +68,20 @@ Linux/macOS 与 Windows 使用同一迁移入口：`go run ./cmd/migrate`。
 | 回滚 1 步 | `.\scripts\dev.ps1 migrate-down` | `make migrate-down` |
 | 回滚 N 步 | `.\scripts\dev.ps1 migrate-down -Steps 2` | `make migrate-down STEPS=2` |
 
-或直接：`go run ./cmd/migrate status|up|down [N]`
+或直接：`cd server && go run ./cmd/migrate status|up|down [N]`
 
 ## 生产构建（Linux）
 
 ```bash
 # 方式 A：交叉编译静态二进制（在开发机执行，产物拷贝到 Linux 服务器）
-make build-linux       # 输出 bin/platform-api, bin/game
+make build-linux       # 输出 server/bin/platform-api, server/bin/game
 
 # 方式 B：Docker 镜像（推荐）
 make docker-build      # game-platform-api:latest, game-server:latest
-make docker-up-prod    # 参考 deploy/docker-compose.prod.yml
+make docker-up-prod    # 参考 server/deploy/docker-compose.prod.yml
 ```
 
-生产环境请修改 `.env` 中的 `JWT_SECRET`、`HMAC_SECRET`、`POSTGRES_PASSWORD`，勿使用 dev 默认值。
+生产环境请修改 `server/.env` 中的 `JWT_SECRET`、`HMAC_SECRET`、`POSTGRES_PASSWORD`，勿使用 dev 默认值。
 
 ## 游戏客户端
 
@@ -94,8 +99,9 @@ make docker-up-prod    # 参考 deploy/docker-compose.prod.yml
 | 项 | 说明 |
 |----|------|
 | 地址 | http://localhost:5173 |
-| 管理员账号 | 手机 `13800000000`，验证码 `123456`（见 `.env` 中 `DEV_SMS_CODE`） |
-| 功能 | 仪表盘 KPI、俱乐部管理、Mock 房卡充值、游戏 ops-hooks 只读 |
+| 管理员账号 | 手机 `13800000000`，验证码 `123456`（见 `server/.env` 中 `DEV_SMS_CODE`） |
+| 工程 | [server/web/admin/](server/web/admin/) |
+| 功能 | 仪表盘 KPI、俱乐部管理、Mock 房卡充值、游戏 ops-hooks、伴侣人设 |
 
 Admin Web 与 Cocos 客户端共用同一 `platform-api`，请求需 HMAC 签名（见 `docs/tech/openapi/http-signature.md`）。
 
@@ -117,19 +123,21 @@ Admin Web 与 Cocos 客户端共用同一 `platform-api`，请求需 HMAC 签名
 ## 目录
 
 ```
-cmd/platform-api/   Gin HTTP
-cmd/game/           Pitaya WS
-scripts/dev.ps1     Windows 开发脚本
-internal/platform/  用户/钱包/房间/俱乐部/catalog/metrics
-internal/game/      GameEngine（dawugui）
-internal/pitaya/    Handler + commitEvents
-web/admin/          Vue 3 运营后台
-client/             Cocos Creator 3 客户端 + Platform SDK
-config/ops-hooks/   游戏运营配置 JSON
-proto/pitaya/       Protobuf
-migrations/         PostgreSQL DDL
-deploy/             docker-compose.yml, Dockerfile, prod compose
-.vscode/launch.json Go 调试配置
+server/                 # Go 后端（独立 go.mod）
+  cmd/platform-api/     Gin HTTP
+  cmd/game/             Pitaya WS
+  internal/platform/    用户/钱包/房间/俱乐部/catalog/metrics/companion
+  internal/game/        GameEngine（dawugui / liuzichong）
+  internal/pitaya/      Handler + commitEvents + bot
+  web/admin/            Vue 3 运营后台
+  config/ops-hooks/     游戏运营配置 JSON
+  proto/pitaya/         Protobuf
+  migrations/           PostgreSQL DDL
+  deploy/               docker-compose.yml, Dockerfile, prod compose
+client/                 # Cocos Creator 3 客户端 + Platform SDK
+scripts/dev.ps1         Windows 开发脚本（转发到 server/ + client/）
+.vscode/launch.json     Go 调试配置（cwd=server）
+docs/                   技术与运营文档
 ```
 
 ## 文档

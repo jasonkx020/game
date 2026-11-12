@@ -1,9 +1,31 @@
-bin/
+# env / secrets
 .env
+server/.env
+
+# Go
+bin/
 *.exe
-web/admin/node_modules/
-web/admin/dist/
+*.test
+*.out
+
+# logs / temp
+*.log
+tmp-*.log
+
+# server admin
+server/web/admin/node_modules/
+server/web/admin/dist/
+server/web/admin/*.tsbuildinfo
+
+# client (Cocos 生成物，非源码)
 client/node_modules/
 client/library/
 client/temp/
 client/local/
+client/build/
+client/native/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+*.swp

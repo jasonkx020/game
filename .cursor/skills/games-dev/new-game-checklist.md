@@ -20,21 +20,21 @@
 ## 后端 — GameEngine
 
 ```
-- [ ] 创建 internal/game/{gameId}/（engine.go, state.go, rules.go 等）
+- [ ] 创建 server/internal/game/{gameId}/（engine.go, state.go, rules.go 等）
 - [ ] 实现 engine.GameEngine 全部方法（Meta/NewState/ApplyAction/...）
 - [ ] 定义 GameID 常量
 - [ ] 编写 engine_test.go 覆盖核心规则
 - [ ] 确认无 Pitaya/Gin/Redis import
-- [ ] 在 internal/game/registry.go 注册 Get() case
+- [ ] 在 server/internal/game/registry.go 注册 Get() case
 ```
 
 ## 后端 — Pitaya Handler
 
 ```
-- [ ] 创建 internal/pitaya/handlers/{gameId}/handler.go
+- [ ] 创建 server/internal/pitaya/handlers/{gameId}/handler.go
 - [ ] 实现游戏 C2S 路由方法
 - [ ] 调用 Engine + commitEvents() 落库与 Push
-- [ ] 在 cmd/game/main.go pitaya.Register(..., WithName("{gameId}"))
+- [ ] 在 server/cmd/game/main.go pitaya.Register(..., WithName("{gameId}"))
 - [ ] Push 含 audit_sn + action_seq
 ```
 
@@ -49,7 +49,7 @@
 ## Proto
 
 ```
-- [ ] 新增 proto/pitaya/{gameId}.proto（不修改已有 message 字段编号）
+- [ ] 新增 server/proto/pitaya/{gameId}.proto（不修改已有 message 字段编号）
 - [ ] Route 命名：game.{gameId}.{method}
 - [ ] 扩展 GameEvent oneof（见 ADR-005）
 - [ ] make gen-proto（Go）

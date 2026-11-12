@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Windows 本地开发脚本（生产构建请用 Makefile / deploy/Dockerfile，目标 Linux）
+  Windows 本地开发脚本（生产构建请用 Makefile / server/deploy/Dockerfile，目标 Linux）
 
 .EXAMPLE
   .\scripts\dev.ps1 up
@@ -22,9 +22,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$Server = Join-Path $Root 'server'
+$Client = Join-Path $Root 'client'
 
 function Import-DotEnv {
-    $envFile = Join-Path $Root '.env'
+    $envFile = Join-Path $Server '.env'
+    if (-not (Test-Path $envFile)) {
+        $envFile = Join-Path $Root '.env'
+    }
     if (-not (Test-Path $envFile)) { return }
     Get-Content $envFile | ForEach-Object {
         $line = $_.Trim()
@@ -51,7 +56,12 @@ function Invoke-Migrate {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$MigrateArgs)
     Import-DotEnv
     $env:MIGRATE_DATABASE_URL = Get-MigrateDatabaseUrl
-    go run ./cmd/migrate @MigrateArgs
+    Push-Location $Server
+    try {
+        go run ./cmd/migrate @MigrateArgs
+    } finally {
+        Pop-Location
+    }
 }
 
 function Get-BufExe {
@@ -81,7 +91,7 @@ function Get-BufExe {
 function Invoke-BufGenerate {
     param([string]$Template = '')
     $buf = Get-BufExe
-    Push-Location (Join-Path $Root 'proto')
+    Push-Location (Join-Path $Server 'proto')
     try {
         if ($Template) {
             & $buf generate --template $Template
@@ -102,7 +112,7 @@ function Invoke-MigrateDocker {
     }
     Write-Host "migrate database (docker): $db"
     docker run --rm `
-        -v "${Root}/migrations:/migrations" `
+        -v "${Server}/migrations:/migrations" `
         migrate/migrate `
         -path=/migrations `
         -database $db `
@@ -123,16 +133,17 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 run-api         启动 platform-api (:8080)
   .\scripts\dev.ps1 run-game        启动 Pitaya game (:3250)
   .\scripts\dev.ps1 run-admin       启动运营后台 (:5173)
-  .\scripts\dev.ps1 test            go test ./...
+  .\scripts\dev.ps1 test            go test ./...（server/）
   .\scripts\dev.ps1 gen-proto       生成 Go proto（自动查找 buf.exe）
   .\scripts\dev.ps1 gen-client-proto  生成客户端 TS proto
-  .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 bin/
+  .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 server/bin/
   .\scripts\dev.ps1 docker-build    构建 Linux 生产镜像
   .\scripts\dev.ps1 serve-bundles   本地托管游戏 Bundle (:8787)
 
+目录：server/（Go 后端）+ client/（Cocos 客户端）
 VS Code: 使用 Run and Debug -> Server (api + game)
 
-Linux 生产: make build-linux / make docker-build，见 deploy/
+Linux 生产: make build-linux / make docker-build，见 server/deploy/
 "@
 }
 
@@ -142,10 +153,10 @@ Import-DotEnv
 switch ($Command) {
     'help' { Show-Help }
     'up' {
-        docker compose -f deploy/docker-compose.yml up -d
+        docker compose -f (Join-Path $Server 'deploy/docker-compose.yml') up -d
     }
     'down' {
-        docker compose -f deploy/docker-compose.yml down
+        docker compose -f (Join-Path $Server 'deploy/docker-compose.yml') down
     }
     'migrate' { Invoke-Migrate 'up' }
     'migrate-status' { Invoke-Migrate 'status' }
@@ -153,43 +164,57 @@ switch ($Command) {
     'migrate-down' { Invoke-Migrate 'down', "$Steps" }
     'migrate-docker' { Invoke-MigrateDocker 'up' }
     'run-api' {
-        go run ./cmd/platform-api
+        Push-Location $Server
+        try { go run ./cmd/platform-api } finally { Pop-Location }
     }
     'run-game' {
-        go run ./cmd/game
+        Push-Location $Server
+        try { go run ./cmd/game } finally { Pop-Location }
     }
     'run-admin' {
-        Push-Location web/admin
+        Push-Location (Join-Path $Server 'web/admin')
         try { npm run dev } finally { Pop-Location }
     }
     'test' {
-        go test ./...
+        Push-Location $Server
+        try { go test ./... } finally { Pop-Location }
     }
     'tidy' {
-        go mod tidy
+        Push-Location $Server
+        try { go mod tidy } finally { Pop-Location }
     }
     'gen-proto' { Invoke-BufGenerate }
     'gen-client-proto' {
         Invoke-BufGenerate -Template 'buf.gen.client.yaml'
-        Push-Location client
+        Push-Location $Client
         try { node scripts/patch-proto-long.mjs } finally { Pop-Location }
     }
     'build-linux' {
-        $env:CGO_ENABLED = '0'
-        $env:GOOS = 'linux'
-        $env:GOARCH = 'amd64'
-        New-Item -ItemType Directory -Force -Path bin | Out-Null
-        go build -ldflags="-s -w" -o bin/platform-api ./cmd/platform-api
-        go build -ldflags="-s -w" -o bin/game ./cmd/game
-        Write-Host "Built bin/platform-api, bin/game (linux/amd64)"
+        Push-Location $Server
+        try {
+            $env:CGO_ENABLED = '0'
+            $env:GOOS = 'linux'
+            $env:GOARCH = 'amd64'
+            New-Item -ItemType Directory -Force -Path bin | Out-Null
+            go build -ldflags="-s -w" -o bin/platform-api ./cmd/platform-api
+            go build -ldflags="-s -w" -o bin/game ./cmd/game
+            Write-Host "Built server/bin/platform-api, server/bin/game (linux/amd64)"
+        } finally {
+            Pop-Location
+        }
     }
     'docker-build' {
-        docker build -f deploy/Dockerfile --target platform-api -t game-platform-api:latest .
-        docker build -f deploy/Dockerfile --target game -t game-server:latest .
-        Write-Host "Built game-platform-api:latest, game-server:latest (linux/amd64)"
+        Push-Location $Server
+        try {
+            docker build -f deploy/Dockerfile --target platform-api -t game-platform-api:latest .
+            docker build -f deploy/Dockerfile --target game -t game-server:latest .
+            Write-Host "Built game-platform-api:latest, game-server:latest (linux/amd64)"
+        } finally {
+            Pop-Location
+        }
     }
     'serve-bundles' {
-        $bundleRoot = Join-Path $Root 'client\build\bundles'
+        $bundleRoot = Join-Path $Client 'build\bundles'
         New-Item -ItemType Directory -Force -Path $bundleRoot | Out-Null
         & (Join-Path $PSScriptRoot 'serve-bundles.ps1') -Root $bundleRoot
     }

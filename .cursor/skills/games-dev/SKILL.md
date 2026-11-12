@@ -9,9 +9,9 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 
 | 组件 | 路径 | 端口 |
 | :--- | :--- | :--- |
-| HTTP 平台 | `cmd/platform-api` | :8080 |
-| Pitaya 游戏 | `cmd/game` | :3250 WS |
-| 运营后台 | `web/admin/` | :5173 |
+| HTTP 平台 | `server/cmd/platform-api` | :8080 |
+| Pitaya 游戏 | `server/cmd/game` | :3250 WS |
+| 运营后台 | `server/web/admin/` | :5173 |
 | Cocos 客户端 | `client/` | Cocos 3.8.8 |
 
 技术栈：Go 1.22+ / Gin + OpenAPI / Pitaya v2 Standalone / PostgreSQL + Redis / Cocos Creator 3 + Vue 3。
@@ -21,7 +21,7 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 ## 游戏大厅与动态 Bundle
 
 - 大厅 API：`GET/PUT /v1/lobby/games`、`GET /v1/lobby/recommendations`
-- **智能伴侣**：`POST /v1/companion/sessions`、`POST .../chat`（SSE）、`internal/platform/companion/`
+- **智能伴侣**：`POST /v1/companion/sessions`、`POST .../chat`（SSE）、`server/internal/platform/companion/`
 - 客户端：`platform/companion/`（CompanionPanel）、`platform/lobby/GameShelf`、`platform/host/GameHost`
 - 新游戏：实现 `{GameId}Module.ts` + Remote Bundle + 可选 `companionHooks`
 - 本地 Bundle 服务：`make serve-bundles`（:8787）
@@ -33,11 +33,11 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 
 | 规则 | 说明 |
 | :--- | :--- |
-| `internal/platform/*` | **禁止** import `internal/game/{具体游戏}` |
-| `internal/game/{id}/` | **禁止** import Pitaya / Gin / Redis |
-| `cmd/platform-api` | **禁止** import pitaya handlers |
-| `internal/game/engine` | 仅 interface 与类型，无 IO |
-| `internal/pitaya/handlers/*` | 薄层：Session/Group/Push/audit，调用 Engine |
+| `server/internal/platform/*` | **禁止** import `internal/game/{具体游戏}` |
+| `server/internal/game/{id}/` | **禁止** import Pitaya / Gin / Redis |
+| `server/cmd/platform-api` | **禁止** import pitaya handlers |
+| `server/internal/game/engine` | 仅 interface 与类型，无 IO |
+| `server/internal/pitaya/handlers/*` | 薄层：Session/Group/Push/audit，调用 Engine |
 
 **职责分工**：GameEngine = 纯规则（服务端权威）；Pitaya Handler = IO + `commitEvents()` 落库与 Push。
 
@@ -68,7 +68,7 @@ make test
 ### Proto 与客户端
 
 ```bash
-make gen-proto              # Go: internal/gen/pitaya/
+make gen-proto              # Go: server/internal/gen/pitaya/
 make gen-client-proto       # TS: client/assets/platform/generated/pitaya/
 cd client && npm test       # Vitest（不依赖 Cocos 编辑器）
 ```
@@ -76,48 +76,49 @@ cd client && npm test       # Vitest（不依赖 Cocos 编辑器）
 ### 生产构建
 
 ```bash
-make build-linux    # bin/platform-api, bin/game
-make docker-build   # Linux 镜像
+make build-linux    # server/bin/platform-api, server/bin/game
+make docker-build   # Linux 镜像（context=server/）
 ```
 
-环境变量：复制 `.env.example` → `.env`。生产勿用 dev 默认 `JWT_SECRET` / `HMAC_SECRET`。
+环境变量：复制 `server/.env.example` → `server/.env`。生产勿用 dev 默认 `JWT_SECRET` / `HMAC_SECRET`。
 
 ## 目录地图
 
 ```
-cmd/platform-api/     Gin HTTP
-cmd/game/             Pitaya WS
-internal/platform/    用户/钱包/房间/俱乐部/metrics
-internal/game/        GameEngine（每游戏一套）
-internal/pitaya/      Handler + commitEvents
-web/admin/            Vue 3 运营后台
-client/               Cocos + Platform SDK
-config/ops-hooks/     游戏运营配置 JSON
-proto/pitaya/         Protobuf
-migrations/           PostgreSQL DDL
-deploy/               docker-compose, Dockerfile
-docs/tech/            技术文档与 ADR
+server/                 # Go 后端（独立 go.mod）
+  cmd/platform-api/     Gin HTTP
+  cmd/game/             Pitaya WS
+  internal/platform/    用户/钱包/房间/俱乐部/metrics/companion
+  internal/game/        GameEngine（每游戏一套）
+  internal/pitaya/      Handler + commitEvents + bot
+  web/admin/            Vue 3 运营后台
+  config/ops-hooks/     游戏运营配置 JSON
+  proto/pitaya/         Protobuf
+  migrations/           PostgreSQL DDL
+  deploy/               docker-compose, Dockerfile
+client/                 # Cocos + Platform SDK
+docs/tech/              技术文档与 ADR
 ```
 
 ## 常见任务决策树
 
 **改 HTTP API（登录/钱包/开房/俱乐部）**
-→ `docs/tech/openapi/` 改契约 → `internal/platform/api/` 实现 → 必要时 `migrations/`
+→ `docs/tech/openapi/` 改契约 → `server/internal/platform/api/` 实现 → 必要时 `server/migrations/`
 
 **改游戏规则或状态机**
-→ `internal/game/{id}/` Engine → `internal/pitaya/handlers/{id}/` Handler → `proto/pitaya/{id}.proto` → `make gen-proto` + `make gen-client-proto`
+→ `server/internal/game/{id}/` Engine → `server/internal/pitaya/handlers/{id}/` Handler → `server/proto/pitaya/{id}.proto` → `make gen-proto` + `make gen-client-proto`
 
 **改客户端联调**
 → `client/assets/platform/sdk/`（ApiClient/PitayaClient/GameSession）→ `client/assets/platform/lobby/` → `client/assets/games/{id}/`（Module/PushHandler/Bundle）
 
 **改游戏大厅或用户偏好**
-→ `internal/platform/lobby/` + `migrations/` + `LobbyScene.ts` + OpenAPI `lobby.yaml`
+→ `server/internal/platform/lobby/` + `server/migrations/` + `LobbyScene.ts` + OpenAPI `lobby.yaml`
 
 **改运营后台**
-→ `web/admin/src/`；API 契约见 `docs/tech/openapi/openapi.yaml`
+→ `server/web/admin/src/`；API 契约见 `docs/tech/openapi/openapi.yaml`
 
 **改数据库**
-→ `migrations/` 新增 up/down；**禁止**修改已发布 proto message 字段编号
+→ `server/migrations/` 新增 up/down；**禁止**修改已发布 proto message 字段编号
 
 **新增游戏**
 → 见 [new-game-checklist.md](new-game-checklist.md)；参考 `dawugui`（完整）与 `liuzichong`（第二范例）
@@ -158,13 +159,13 @@ Push Route：`onRoomState`、`onDeal`、`onTurnNotify`、`onAlert`、`onSettleme
 
 ### 增游戏注册点
 
-1. `internal/game/registry.go` — `Get(gameID)` switch
-2. `cmd/game/main.go` — `pitaya.Register(..., component.WithName("{gameId}"))`
+1. `server/internal/game/registry.go` — `Get(gameID)` switch
+2. `server/cmd/game/main.go` — `pitaya.Register(..., component.WithName("{gameId}"))`
 
 ### 编码惯例
 
 - 状态机：**手写 phase enum**，不用 FSM 库
-- Engine **禁止** import 框架；测试放 `internal/game/{id}/engine_test.go`
+- Engine **禁止** import 框架；测试放 `server/internal/game/{id}/engine_test.go`
 - HTTP 请求需 HMAC 签名，见 [http-signature.md](../../docs/tech/openapi/http-signature.md)
 - 最小 diff：只改任务相关文件，匹配现有命名与 import 风格
 

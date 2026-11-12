@@ -59,11 +59,11 @@ docs/tech/
 
 ## 新游戏接入
 
-1. `internal/game/{id}/` GameEngine
-2. `internal/pitaya/handlers/{id}/` Handler
-3. `proto/pitaya/{id}.proto`
+1. `server/internal/game/{id}/` GameEngine
+2. `server/internal/pitaya/handlers/{id}/` Handler
+3. `server/proto/pitaya/{id}.proto`
 4. `docs/games/{id}/ops-hooks.md`
-5. Cocos `games/{id}/` + PitayaClient Push 订阅 + GameEvent 映射
+5. Cocos `client/assets/games/{id}/` + PitayaClient Push 订阅 + GameEvent 映射
 
 详见 [adr/002-pluggable-game-constraints.md](adr/002-pluggable-game-constraints.md)。
 
@@ -75,5 +75,6 @@ docs/tech/
 | :--- | :--- |
 | [../../README.md](../../README.md) | **本地启动**（含 `client/` Cocos SDK） |
 | [../../client/README.md](../../client/README.md) | 客户端工程与场景挂载 |
+| [games-lobby-migration.md](games-lobby-migration.md) | 独立大厅 App 迁出指南 |
 | [运营手册.md](../../运营手册.md) | 总索引 |
 | [games/README.md](../games/README.md) | 游戏接入 |
