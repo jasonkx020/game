@@ -1,8 +1,0 @@
-# Shared TLS settings (paths relative to conf/)
-ssl_certificate     ssl/dev-server.crt;
-ssl_certificate_key ssl/dev-server.key;
-ssl_protocols       TLSv1.2 TLSv1.3;
-ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256;
-ssl_prefer_server_ciphers on;
-ssl_session_cache   shared:SSL:10m;
-ssl_session_timeout 10m;
