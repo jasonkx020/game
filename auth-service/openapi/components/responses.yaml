@@ -1,0 +1,38 @@
+BadRequest:
+  description: 请求参数错误（code=400）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+Unauthorized:
+  description: 未授权 / Token 无效 / 验证码错误（code=1001）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+Forbidden:
+  description: 禁止访问、频控或实名不一致（code=403）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+Conflict:
+  description: 资源冲突，如手机/邮箱已注册（code=409）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+
+SignatureInvalid:
+  description: 签名校验失败、时间戳过期或 Nonce 重放（code 1002/1003/1004）
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        code: 1002
+        message: signature invalid
+        request_id: "1719980000123456789"

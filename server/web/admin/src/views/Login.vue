@@ -14,6 +14,9 @@
         </el-button>
       </el-form>
       <p class="hint">开发环境验证码：123456；平台管理员：13800000000</p>
+      <p class="docs-link">
+        <router-link to="/docs">查看协议与接入文档</router-link>
+      </p>
     </el-card>
   </div>
 </template>
@@ -59,5 +62,14 @@ async function onSubmit() {
   margin-top: 16px;
   color: #909399;
   font-size: 12px;
+}
+.docs-link {
+  margin-top: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+.docs-link a {
+  color: #409eff;
+  text-decoration: none;
 }
 </style>

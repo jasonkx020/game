@@ -1,6 +1,7 @@
 # OpenAPI 3.0 HTTP API 规范
 
-> HTTP REST 契约，遵循 **OpenAPI 3.0.3**。总览见 [protocol.md](../protocol.md)。
+> HTTP REST 契约，遵循 **OpenAPI 3.0.3**。总览见 [protocol.md](../protocol.md)。  
+> 后台在线查看：`http://localhost:5173/docs` →「平台 OpenAPI」/「Auth OpenAPI」。
 
 ---
 
@@ -89,7 +90,7 @@ openapi-generator-cli generate -i openapi.yaml -g typescript-fetch -o ../../../c
 
 | 文件 | 路径 |
 | :--- | :--- |
-| auth.yaml | send-code / register / login / oauth/wechat / realname / me / refresh（**auth-service :8081**） |
+| （Auth） | **不在本包**：见 `auth-service/openapi/` / 后台「Auth OpenAPI」 |
 | user.yaml | GET `/v1/user/profile` |
 | wallet.yaml | GET `/v1/wallet/room-card`, GET `/v1/wallet/game-coin/{game_id}` |
 | room.yaml | POST `/v1/rooms`, GET `/v1/rooms/{room_id}`, POST `/v1/rooms/{room_id}/join` |

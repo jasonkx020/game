@@ -22,9 +22,19 @@ const (
 	ChannelPhone = "phone"
 	ChannelEmail = "email"
 
-	PurposeRegister = "register"
-	PurposeLogin    = "login"
+	PurposeSignIn   = "signin"
+	PurposeRegister = "register" // deprecated alias → stored as signin
+	PurposeLogin    = "login"    // deprecated alias → stored as signin
 )
+
+func NormalizePurpose(purpose string) (string, error) {
+	switch purpose {
+	case PurposeSignIn, PurposeRegister, PurposeLogin:
+		return PurposeSignIn, nil
+	default:
+		return "", fmt.Errorf("invalid purpose")
+	}
+}
 
 type Store struct {
 	rdb           *goredis.Client
@@ -48,8 +58,9 @@ func (s *Store) Send(ctx context.Context, channel, target, purpose string) (stri
 	if channel != ChannelPhone && channel != ChannelEmail {
 		return "", fmt.Errorf("invalid channel")
 	}
-	if purpose != PurposeRegister && purpose != PurposeLogin {
-		return "", fmt.Errorf("invalid purpose")
+	purpose, err := NormalizePurpose(purpose)
+	if err != nil {
+		return "", err
 	}
 	if target == "" {
 		return "", fmt.Errorf("target required")
@@ -85,6 +96,10 @@ func (s *Store) Send(ctx context.Context, channel, target, purpose string) (stri
 
 func (s *Store) Verify(ctx context.Context, channel, target, purpose, code string) error {
 	if code == "" {
+		return ErrInvalidCode
+	}
+	purpose, err := NormalizePurpose(purpose)
+	if err != nil {
 		return ErrInvalidCode
 	}
 	// Dev bypass

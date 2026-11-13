@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: Auth Service HTTP API
+  description: |
+    独立登录与身份服务（auth-api）。其他业务项目只需：
+    1. 直连本服务完成 sign-in / 微信 / 刷新 / 实名；
+    2. 用共享 `JWT_SECRET` 校验业务请求中的未过期 access JWT（`sub`=account_id）。
+
+    **签名**：所有 `/v1/*` 须 HMAC，见 [http-signature.md](./http-signature.md)。
+    **Refresh**：body 同时带 `access_token`（可过期）+ `refresh_token`，主体一致才轮换。
+    **玩家入口**：`POST /v1/auth/sign-in`（无号建号、有号登录，响应 `is_new_user`）。
+  version: 1.2.0
+  contact:
+    name: Auth Team
+
+servers:
+  - url: http://localhost:8081
+    description: 本地 auth-api
+  - url: https://auth.example.com
+    description: 生产（按环境替换）
+
+tags:
+  - name: Auth
+    description: 玩家 sign-in / 微信 / 实名 / Token
+  - name: AdminAuth
+    description: 管理员登录与 Token（不自动建号）
+  - name: System
+    description: 健康检查
+
+security:
+  - signatureAuth: []
+
+paths:
+  /healthz:
+    get:
+      tags: [System]
+      summary: 健康检查
+      operationId: healthz
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /v1/auth/send-code:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1send-code'
+  /v1/auth/sign-in:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1sign-in'
+  /v1/auth/register:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1register'
+  /v1/auth/login:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1login'
+  /v1/auth/oauth/wechat:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1oauth~1wechat'
+  /v1/auth/refresh:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1refresh'
+  /v1/auth/logout:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1logout'
+  /v1/auth/me:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1me'
+  /v1/auth/realname/verify:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1realname~1verify'
+  /v1/auth/introspect:
+    $ref: './paths/auth.yaml#/~1v1~1auth~1introspect'
+
+  /v1/admin/auth/login:
+    $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1login'
+  /v1/admin/auth/refresh:
+    $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1refresh'
+  /v1/admin/auth/logout:
+    $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1logout'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './components/securitySchemes.yaml#/bearerAuth'
+    signatureAuth:
+      $ref: './components/securitySchemes.yaml#/signatureAuth'
+  schemas:
+    ApiError:
+      $ref: './components/schemas.yaml#/ApiError'
+    OkResponse:
+      $ref: './components/schemas.yaml#/OkResponse'
+    SendCodeRequest:
+      $ref: './components/schemas.yaml#/SendCodeRequest'
+    RegisterRequest:
+      $ref: './components/schemas.yaml#/RegisterRequest'
+    LoginRequest:
+      $ref: './components/schemas.yaml#/LoginRequest'
+    WeChatLoginRequest:
+      $ref: './components/schemas.yaml#/WeChatLoginRequest'
+    TokenPair:
+      $ref: './components/schemas.yaml#/TokenPair'
+    RefreshRequest:
+      $ref: './components/schemas.yaml#/RefreshRequest'
+    LogoutRequest:
+      $ref: './components/schemas.yaml#/LogoutRequest'
+    AuthProfile:
+      $ref: './components/schemas.yaml#/AuthProfile'
+    RealnameVerifyRequest:
+      $ref: './components/schemas.yaml#/RealnameVerifyRequest'
+    IntrospectResponse:
+      $ref: './components/schemas.yaml#/IntrospectResponse'
+    AdminLoginRequest:
+      $ref: './components/schemas.yaml#/AdminLoginRequest'
+  responses:
+    BadRequest:
+      $ref: './components/responses.yaml#/BadRequest'
+    Unauthorized:
+      $ref: './components/responses.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './components/responses.yaml#/Forbidden'
+    Conflict:
+      $ref: './components/responses.yaml#/Conflict'
+    SignatureInvalid:
+      $ref: './components/responses.yaml#/SignatureInvalid'

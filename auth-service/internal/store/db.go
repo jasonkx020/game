@@ -8,10 +8,16 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 var ErrNotFound = errors.New("not found")
+
+// IsUniqueViolation reports PostgreSQL unique_violation (23505).
+func IsUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
 
 type Account struct {
 	ID                  int64      `db:"id"`
@@ -49,11 +55,13 @@ func (a *Account) EmailStr() string {
 }
 
 type RefreshRecord struct {
-	AccountID int64     `db:"account_id"`
-	TokenHash string    `db:"token_hash"`
-	ExpiresAt time.Time `db:"expires_at"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	AccountID     int64      `db:"account_id"`
+	TokenHash     string     `db:"token_hash"`
+	ExpiresAt     time.Time  `db:"expires_at"`
+	PrevTokenHash *string    `db:"prev_token_hash"`
+	PrevExpiresAt *time.Time `db:"prev_expires_at"`
+	CreatedAt     time.Time  `db:"created_at"`
+	UpdatedAt     time.Time  `db:"updated_at"`
 }
 
 type OAuthIdentity struct {
@@ -152,22 +160,31 @@ func (s *Store) UpdateRealname(ctx context.Context, id int64, status, realName, 
 	return err
 }
 
-func (s *Store) UpsertRefresh(ctx context.Context, accountID int64, tokenHash string, expiresAt time.Time) error {
+// UpsertRefresh 写入新 refresh；若账号已有记录，将旧 hash 保留为 prev，宽限至 graceUntil（仅 UPDATE 路径）。
+func (s *Store) UpsertRefresh(ctx context.Context, accountID int64, tokenHash string, expiresAt, graceUntil time.Time) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO auth_refresh_tokens (account_id, token_hash, expires_at, created_at, updated_at)
-		VALUES ($1,$2,$3,now(),now())
+		INSERT INTO auth_refresh_tokens (
+			account_id, token_hash, expires_at, prev_token_hash, prev_expires_at, created_at, updated_at
+		) VALUES ($1,$2,$3,NULL,NULL,now(),now())
 		ON CONFLICT (account_id) DO UPDATE SET
-			token_hash=EXCLUDED.token_hash,
-			expires_at=EXCLUDED.expires_at,
-			updated_at=now()`, accountID, tokenHash, expiresAt)
+			prev_token_hash = auth_refresh_tokens.token_hash,
+			prev_expires_at = $4,
+			token_hash = EXCLUDED.token_hash,
+			expires_at = EXCLUDED.expires_at,
+			updated_at = now()`, accountID, tokenHash, expiresAt, graceUntil)
 	return err
 }
 
+// GetRefreshByHash 匹配当前 token_hash，或宽限期内的 prev_token_hash（解决轮换后客户端未落盘）。
 func (s *Store) GetRefreshByHash(ctx context.Context, tokenHash string) (*RefreshRecord, error) {
 	var r RefreshRecord
 	err := s.db.GetContext(ctx, &r, `
-		SELECT account_id, token_hash, expires_at, created_at, updated_at
-		FROM auth_refresh_tokens WHERE token_hash=$1`, tokenHash)
+		SELECT account_id, token_hash, expires_at, prev_token_hash, prev_expires_at, created_at, updated_at
+		FROM auth_refresh_tokens
+		WHERE token_hash = $1
+		   OR (prev_token_hash = $1 AND prev_expires_at IS NOT NULL AND prev_expires_at > now())
+		ORDER BY CASE WHEN token_hash = $1 THEN 0 ELSE 1 END
+		LIMIT 1`, tokenHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

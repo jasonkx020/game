@@ -8,6 +8,8 @@ export interface LoginResult {
   nickname: string
   role: string
   expiresIn?: number
+  /** true when this call created the account (phone/email sign-in or first WeChat bind) */
+  isNewUser?: boolean
 }
 
 export interface UserProfile {
@@ -98,6 +100,9 @@ export class ApiClient {
   private token = ''
   private refresh = ''
   private cfg: ClientConfig
+  /** Optional persist hook; called after tokens are successfully updated in memory. */
+  private onTokensUpdated: ((pair: LoginResult) => void) | null = null
+  private refreshInFlight: Promise<LoginResult> | null = null
 
   constructor(cfg: Partial<ClientConfig> = {}) {
     this.cfg = { ...defaultConfig, ...cfg }
@@ -109,6 +114,10 @@ export class ApiClient {
 
   get refreshToken(): string {
     return this.refresh
+  }
+
+  setOnTokensUpdated(cb: ((pair: LoginResult) => void) | null): void {
+    this.onTokensUpdated = cb
   }
 
   setAccessToken(token: string): void {
@@ -128,55 +137,69 @@ export class ApiClient {
   async sendCode(params: {
     channel: 'phone' | 'email'
     target: string
-    purpose: 'register' | 'login'
+    /** prefer `signin`; `register`/`login` accepted as aliases */
+    purpose: 'signin' | 'register' | 'login'
   }): Promise<void> {
     await this.authPost('/v1/auth/send-code', params)
   }
 
+  /** Unified player phone/email entry: creates account if missing. */
+  async signIn(params: {
+    channel: 'phone' | 'email'
+    target: string
+    code: string
+    nickname?: string
+  }): Promise<LoginResult> {
+    const body =
+      params.channel === 'phone'
+        ? {
+            channel: 'phone' as const,
+            target: params.target,
+            phone: params.target,
+            code: params.code,
+            sms_code: params.code,
+            ...(params.nickname ? { nickname: params.nickname } : {}),
+          }
+        : {
+            channel: 'email' as const,
+            target: params.target,
+            email: params.target,
+            code: params.code,
+            ...(params.nickname ? { nickname: params.nickname } : {}),
+          }
+    const res = await this.authPost<{
+      access_token: string
+      refresh_token: string
+      user_id: number
+      nickname: string
+      role: string
+      expires_in?: number
+      is_new_user?: boolean
+    }>('/v1/auth/sign-in', body)
+    return this.applyTokenPair(res)
+  }
+
+  /** @deprecated use signIn */
   async register(params: {
     channel: 'phone' | 'email'
     target: string
     code: string
     nickname?: string
   }): Promise<LoginResult> {
-    const res = await this.authPost<{
-      access_token: string
-      refresh_token: string
-      user_id: number
-      nickname: string
-      role: string
-      expires_in?: number
-    }>('/v1/auth/register', {
-      channel: params.channel,
-      target: params.target,
-      code: params.code,
-      ...(params.nickname ? { nickname: params.nickname } : {}),
-    })
-    return this.applyTokenPair(res)
+    return this.signIn(params)
   }
 
   async login(phone: string, smsCode: string): Promise<LoginResult> {
-    return this.loginWithCode({ channel: 'phone', target: phone, code: smsCode })
+    return this.signIn({ channel: 'phone', target: phone, code: smsCode })
   }
 
+  /** @deprecated use signIn */
   async loginWithCode(params: {
     channel: 'phone' | 'email'
     target: string
     code: string
   }): Promise<LoginResult> {
-    const body =
-      params.channel === 'phone'
-        ? { channel: 'phone', phone: params.target, sms_code: params.code, code: params.code }
-        : { channel: 'email', email: params.target, code: params.code }
-    const res = await this.authPost<{
-      access_token: string
-      refresh_token: string
-      user_id: number
-      nickname: string
-      role: string
-      expires_in?: number
-    }>('/v1/auth/login', body)
-    return this.applyTokenPair(res)
+    return this.signIn(params)
   }
 
   /** platform: client-detected `web` | `miniprogram` */
@@ -188,6 +211,7 @@ export class ApiClient {
       nickname: string
       role: string
       expires_in?: number
+      is_new_user?: boolean
     }>('/v1/auth/oauth/wechat', { platform, code })
     return this.applyTokenPair(res)
   }
@@ -254,48 +278,71 @@ export class ApiClient {
     nickname: string
     role: string
     expires_in?: number
+    is_new_user?: boolean
   }): LoginResult {
     this.token = res.access_token
     this.refresh = res.refresh_token
-    return {
+    const pair: LoginResult = {
       accessToken: res.access_token,
       refreshToken: res.refresh_token,
       userId: res.user_id,
       nickname: res.nickname,
       role: res.role,
       expiresIn: res.expires_in,
+      isNewUser: res.is_new_user,
     }
+    this.onTokensUpdated?.(pair)
+    return pair
   }
 
   /**
    * Dual-token refresh: must send current access (even if expired) + refresh.
-   * Rotates both tokens on success.
+   * Rotates both tokens on success. Retries with the same old pair on network/5xx
+   * (server keeps previous refresh valid during grace). Single-flight for concurrency.
    */
   async refreshTokens(): Promise<LoginResult> {
-    if (!this.token || !this.refresh) {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight
+    }
+    this.refreshInFlight = this.doRefreshTokens().finally(() => {
+      this.refreshInFlight = null
+    })
+    return this.refreshInFlight
+  }
+
+  private async doRefreshTokens(): Promise<LoginResult> {
+    const access = this.token
+    const refresh = this.refresh
+    if (!access || !refresh) {
       throw { code: 1001, message: 'access_token and refresh_token required' } as ApiError
     }
-    const res = await this.authPost<{
-      access_token: string
-      refresh_token: string
-      user_id: number
-      nickname: string
-      role: string
-      expires_in?: number
-    }>('/v1/auth/refresh', {
-      access_token: this.token,
-      refresh_token: this.refresh,
-    })
-    this.token = res.access_token
-    this.refresh = res.refresh_token
-    return {
-      accessToken: res.access_token,
-      refreshToken: res.refresh_token,
-      userId: res.user_id,
-      nickname: res.nickname,
-      role: res.role,
-      expiresIn: res.expires_in,
+
+    const maxAttempts = 3
+    let lastErr: unknown
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const res = await this.authPost<{
+          access_token: string
+          refresh_token: string
+          user_id: number
+          nickname: string
+          role: string
+          expires_in?: number
+        }>('/v1/auth/refresh', {
+          access_token: access,
+          refresh_token: refresh,
+        })
+        // Only mutate memory after a full successful response
+        return this.applyTokenPair(res)
+      } catch (err) {
+        lastErr = err
+        if (!isRetryableRefreshError(err) || attempt === maxAttempts - 1) {
+          throw err
+        }
+        await sleepMs(200 * (attempt + 1))
+      }
     }
+    throw lastErr
   }
 
   async logout(): Promise<void> {
@@ -554,10 +601,45 @@ export class ApiClient {
       },
       body: bodyStr || undefined,
     })
-    const data = await res.json()
+    let data: unknown
+    try {
+      data = await res.json()
+    } catch {
+      if (!res.ok) {
+        throw { code: res.status, message: `HTTP ${res.status}` } as ApiError
+      }
+      throw { code: 500, message: 'invalid JSON response' } as ApiError
+    }
     if (!res.ok) {
-      throw data as ApiError
+      const err = (data && typeof data === 'object' ? data : {}) as ApiError
+      if (typeof err.code !== 'number') {
+        err.code = res.status
+      }
+      if (!err.message) {
+        err.message = `HTTP ${res.status}`
+      }
+      throw err
     }
     return data as T
   }
+}
+
+function isRetryableRefreshError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return true
+  }
+  const code = (err as ApiError).code
+  if (typeof code !== 'number') {
+    return true
+  }
+  // Auth / client errors: do not retry (invalid or expired refresh outside grace)
+  if (code === 1001 || code === 401 || code === 403 || code === 400) {
+    return false
+  }
+  // HTTP 5xx or transient
+  return code >= 500 || code === 0
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

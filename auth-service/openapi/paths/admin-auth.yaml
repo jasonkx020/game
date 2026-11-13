@@ -1,0 +1,93 @@
+/v1/admin/auth/login:
+  post:
+    tags: [AdminAuth]
+    summary: 管理员短信验证码登录
+    operationId: adminAuthLogin
+    description: |
+      账号须已在 auth_accounts（principal_type=admin）中存在（如 ADMIN_DEV_PHONE 种子）。
+      不支持邮箱/微信注册路径。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/AdminLoginRequest'
+    responses:
+      '200':
+        description: 登录成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/auth/refresh:
+  post:
+    tags: [AdminAuth]
+    summary: 管理员双 Token 刷新
+    operationId: adminAuthRefresh
+    description: 与玩家 refresh 相同协议；要求 access.typ=admin。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RefreshRequest'
+    responses:
+      '200':
+        description: 刷新成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/admin/auth/logout:
+  post:
+    tags: [AdminAuth]
+    summary: 管理员注销 refresh
+    operationId: adminAuthLogout
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LogoutRequest'
+    responses:
+      '200':
+        description: 已注销
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/OkResponse'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

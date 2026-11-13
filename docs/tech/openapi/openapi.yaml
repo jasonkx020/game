@@ -2,10 +2,14 @@ openapi: 3.0.3
 info:
   title: 游戏平台 HTTP API
   description: |
-    平台 HTTP REST 接口，遵循 OpenAPI 3.0。
+    平台业务 HTTP REST 接口（platform-api，默认 `:8080`），遵循 OpenAPI 3.0。
     所有请求须携带 HMAC-SHA256 签名 Header，详见 docs/tech/openapi/http-signature.md。
+
+    **登录 / sign-in / 微信 / 实名 / refresh** 已迁至独立 auth-service（`:8081`），
+    请查看侧栏 **Auth OpenAPI**（`/openapi/auth/openapi.yaml`），本文件不再索引 Auth 路径。
+
     游戏内实时消息走 Pitaya WebSocket + Protobuf，见 docs/tech/protocol.md。
-  version: 1.0.0
+  version: 1.2.0
   contact:
     name: Platform Team
 
@@ -14,10 +18,10 @@ servers:
     description: 生产环境
   - url: https://api-staging.example.com
     description: 预发环境
+  - url: http://localhost:8080
+    description: 本地 platform-api
 
 tags:
-  - name: Auth
-    description: 登录与 Token
   - name: User
     description: 用户资料
   - name: Wallet
@@ -37,17 +41,13 @@ tags:
   - name: Audit
     description: 运营审计与报表
   - name: Admin
-    description: 运营后台管理员
+    description: 运营后台（非登录类）
 
 security:
   - bearerAuth: []
     signatureAuth: []
 
 paths:
-  /v1/auth/login:
-    $ref: './paths/auth.yaml#/~1v1~1auth~1login'
-  /v1/auth/refresh:
-    $ref: './paths/auth.yaml#/~1v1~1auth~1refresh'
   /v1/user/profile:
     $ref: './paths/user.yaml#/~1v1~1user~1profile'
   /v1/wallet/room-card:
@@ -82,10 +82,6 @@ paths:
     $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1overview'
   /v1/admin/metrics/room-cards:
     $ref: './paths/admin.yaml#/~1v1~1admin~1metrics~1room-cards'
-  /v1/admin/auth/login:
-    $ref: './paths/admin.yaml#/~1v1~1admin~1auth~1login'
-  /v1/admin/auth/refresh:
-    $ref: './paths/admin.yaml#/~1v1~1admin~1auth~1refresh'
   /v1/admin/users:
     $ref: './paths/admin.yaml#/~1v1~1admin~1users'
   /v1/admin/players:
@@ -125,6 +121,17 @@ components:
       $ref: './components/securitySchemes.yaml#/bearerAuth'
     signatureAuth:
       $ref: './components/securitySchemes.yaml#/signatureAuth'
+  parameters:
+    XAppId:
+      $ref: './components/parameters.yaml#/XAppId'
+    XTimestamp:
+      $ref: './components/parameters.yaml#/XTimestamp'
+    XNonce:
+      $ref: './components/parameters.yaml#/XNonce'
+    XContentSha256:
+      $ref: './components/parameters.yaml#/XContentSha256'
+    XSignature:
+      $ref: './components/parameters.yaml#/XSignature'
   schemas:
     ApiError:
       $ref: './components/schemas.yaml#/ApiError'

@@ -41,9 +41,20 @@ async function request<T>(
     body: bodyStr || undefined,
   })
 
-  const data = await res.json()
+  let data: unknown
+  try {
+    data = await res.json()
+  } catch {
+    if (!res.ok) {
+      throw { code: res.status, message: `HTTP ${res.status}` } as ApiError
+    }
+    throw { code: 500, message: 'invalid JSON response' } as ApiError
+  }
   if (!res.ok) {
-    throw data as ApiError
+    const err = (data && typeof data === 'object' ? data : {}) as ApiError
+    if (typeof err.code !== 'number') err.code = res.status
+    if (!err.message) err.message = `HTTP ${res.status}`
+    throw err
   }
   return data as T
 }

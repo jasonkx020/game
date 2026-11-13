@@ -1,0 +1,296 @@
+ApiError:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: integer
+      description: |
+        业务错误码。常见：
+        - 400 参数错误
+        - 403 禁止 / 实名不一致 / 频控
+        - 409 冲突（已注册）
+        - 1001 未授权 / Token 无效
+        - 1002 签名失败
+        - 1003 时间戳过期
+        - 1004 Nonce 重放
+    message:
+      type: string
+    request_id:
+      type: string
+
+OkResponse:
+  type: object
+  required: [ok]
+  properties:
+    ok:
+      type: boolean
+      example: true
+    request_id:
+      type: string
+
+# ---------- OTP / Sign-In ----------
+
+SendCodeRequest:
+  type: object
+  required: [channel, target, purpose]
+  properties:
+    channel:
+      type: string
+      enum: [phone, email]
+    target:
+      type: string
+      description: 手机号或邮箱
+      example: "13800138000"
+    purpose:
+      type: string
+      enum: [signin, register, login]
+      description: |
+        推荐 `signin`。`register`/`login` 为兼容别名，行为相同（仅发码+频控，不预检账号是否存在）。
+
+SignInRequest:
+  type: object
+  description: |
+    玩家统一登录/注册。推荐 `channel` + `target` + `code`；
+    兼容旧字段：`phone` + `sms_code`，或 `email` + `code`。
+    `nickname` 仅新建账号时生效。
+  properties:
+    channel:
+      type: string
+      enum: [phone, email]
+      default: phone
+    target:
+      type: string
+    phone:
+      type: string
+      example: "13800138000"
+    email:
+      type: string
+      format: email
+    code:
+      type: string
+    sms_code:
+      type: string
+      example: "123456"
+      description: 兼容字段，等价于 code
+    nickname:
+      type: string
+      description: 可选；仅新用户建号时生效
+
+# deprecated 别名：与 SignInRequest 同结构（避免 allOf+# 在跨文件解析时丢指针）
+RegisterRequest:
+  type: object
+  description: deprecated，请使用 SignInRequest / POST /v1/auth/sign-in
+  properties:
+    channel:
+      type: string
+      enum: [phone, email]
+      default: phone
+    target:
+      type: string
+    phone:
+      type: string
+    email:
+      type: string
+      format: email
+    code:
+      type: string
+    sms_code:
+      type: string
+    nickname:
+      type: string
+
+LoginRequest:
+  type: object
+  description: deprecated（玩家路径），请使用 SignInRequest；Admin 仍用 AdminLoginRequest
+  properties:
+    channel:
+      type: string
+      enum: [phone, email]
+      default: phone
+    target:
+      type: string
+    phone:
+      type: string
+      example: "13800138000"
+    email:
+      type: string
+      format: email
+    code:
+      type: string
+    sms_code:
+      type: string
+      example: "123456"
+    nickname:
+      type: string
+    device_id:
+      type: string
+
+WeChatLoginRequest:
+  type: object
+  required: [platform, code]
+  properties:
+    platform:
+      type: string
+      enum: [web, miniprogram]
+      description: 由客户端判断运行环境后上报
+    code:
+      type: string
+      description: 微信授权 code（小程序 wx.login / Web OAuth code）
+
+TokenPair:
+  type: object
+  required:
+    - access_token
+    - refresh_token
+    - expires_in
+    - account_id
+  properties:
+    access_token:
+      type: string
+      description: JWT access；业务服用共享 JWT_SECRET 校验未过期 token
+    refresh_token:
+      type: string
+      description: opaque refresh；仅 auth-service 可轮换
+    expires_in:
+      type: integer
+      description: access 有效秒数
+      example: 7200
+    refresh_expires_in:
+      type: integer
+      description: refresh 有效秒数
+    token_type:
+      type: string
+      example: Bearer
+    account_id:
+      type: integer
+      format: int64
+      description: auth_accounts.id（JWT sub）
+    user_id:
+      type: integer
+      format: int64
+      description: 兼容字段，等于 account_id
+    role:
+      type: string
+      example: player
+    nickname:
+      type: string
+    phone:
+      type: string
+    email:
+      type: string
+    is_new_user:
+      type: boolean
+      description: 本次请求是否新建了账号（sign-in / 微信首次绑定为 true）
+    request_id:
+      type: string
+
+# ---------- Refresh / Logout ----------
+
+RefreshRequest:
+  type: object
+  required: [access_token, refresh_token]
+  properties:
+    access_token:
+      type: string
+      description: 当前 access JWT；即使已过期也必须上传（服务端验签并忽略 exp）
+    refresh_token:
+      type: string
+      description: opaque refresh；须与 access.sub 主体一致且未过期
+
+LogoutRequest:
+  type: object
+  properties:
+    access_token:
+      type: string
+      description: 若未带 Authorization Bearer，可用 body 传 access_token（可过期）
+
+# ---------- Profile / Realname / Introspect ----------
+
+AuthProfile:
+  type: object
+  required: [account_id, role, nickname, realname_status]
+  properties:
+    account_id:
+      type: integer
+      format: int64
+    principal_type:
+      type: string
+      enum: [player, admin]
+    role:
+      type: string
+    nickname:
+      type: string
+    avatar_url:
+      type: string
+    phone:
+      type: string
+    email:
+      type: string
+    status:
+      type: string
+      example: active
+    realname_status:
+      type: string
+      enum: [none, verified, failed]
+    real_name_masked:
+      type: string
+      description: 脱敏姓名，如 张*
+    id_card_masked:
+      type: string
+      description: 脱敏证件号；从不返回明文
+    is_minor:
+      type: boolean
+    request_id:
+      type: string
+
+RealnameVerifyRequest:
+  type: object
+  required: [real_name, id_card_no]
+  properties:
+    real_name:
+      type: string
+      example: 张三
+    id_card_no:
+      type: string
+      description: 二代居民身份证号明文（仅传输，服务端不落库明文）
+      example: "110101199003078477"
+
+IntrospectResponse:
+  type: object
+  properties:
+    account_id:
+      type: integer
+      format: int64
+    role:
+      type: string
+    principal_type:
+      type: string
+    nickname:
+      type: string
+    phone:
+      type: string
+    email:
+      type: string
+    status:
+      type: string
+    realname_status:
+      type: string
+    exp:
+      type: integer
+      format: int64
+      description: access JWT exp（Unix 秒）
+    request_id:
+      type: string
+
+# ---------- Admin ----------
+
+AdminLoginRequest:
+  type: object
+  required: [phone, sms_code]
+  properties:
+    phone:
+      type: string
+      example: "13800000000"
+    sms_code:
+      type: string
+      example: "123456"

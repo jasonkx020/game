@@ -88,6 +88,9 @@ LoginRequest:
 
 LoginResponse:
   type: object
+  description: |
+    兼容别名。权威定义见 auth-service/openapi/components/schemas.yaml#/TokenPair
+    （含 account_id、refresh_expires_in、email 等）。
   required:
     - access_token
     - refresh_token
@@ -101,9 +104,23 @@ LoginResponse:
     expires_in:
       type: integer
       description: access_token 有效秒数
+    refresh_expires_in:
+      type: integer
+    account_id:
+      type: integer
+      format: int64
     user_id:
       type: integer
       format: int64
+      description: 兼容字段，等于 account_id
+    role:
+      type: string
+    nickname:
+      type: string
+    phone:
+      type: string
+    email:
+      type: string
     sign_key_version:
       type: string
       description: 当前 app_secret 版本号，客户端据此选择签名密钥
@@ -353,7 +370,7 @@ GameConfig:
       type: object
       additionalProperties:
         type: integer
-      description: 玩家人数 -> 房卡消耗，如 "4": 2
+      description: '玩家人数 -> 房卡消耗，如 "4": 2'
     tiers:
       type: array
       items:

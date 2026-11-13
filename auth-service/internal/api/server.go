@@ -44,8 +44,9 @@ func (s *Server) build() *gin.Engine {
 	}, s.rdb))
 
 	v1.POST("/auth/send-code", s.sendCode)
-	v1.POST("/auth/register", s.register)
-	v1.POST("/auth/login", s.playerLogin)
+	v1.POST("/auth/sign-in", s.signIn)
+	v1.POST("/auth/register", s.register) // deprecated → SignIn
+	v1.POST("/auth/login", s.playerLogin) // deprecated alias → SignIn
 	v1.POST("/auth/oauth/wechat", s.wechatLogin)
 	v1.POST("/auth/refresh", s.playerRefresh)
 	v1.POST("/auth/logout", s.logout)
@@ -77,23 +78,12 @@ func (s *Server) sendCode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "request_id": c.GetString("request_id")})
 }
 
-func (s *Server) register(c *gin.Context) {
-	var req struct {
-		Channel  string `json:"channel"`
-		Target   string `json:"target"`
-		Code     string `json:"code"`
-		SMSCode  string `json:"sms_code"`
-		Nickname string `json:"nickname"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
+func (s *Server) signIn(c *gin.Context) {
+	channel, target, code, nickname, ok := parseSignInBody(c)
+	if !ok {
 		return
 	}
-	code := req.Code
-	if code == "" {
-		code = req.SMSCode
-	}
-	pair, err := s.auth.Register(c.Request.Context(), req.Channel, req.Target, code, req.Nickname)
+	pair, err := s.auth.SignIn(c.Request.Context(), channel, target, code, nickname)
 	if err != nil {
 		writeAuthErr(c, err)
 		return
@@ -101,20 +91,19 @@ func (s *Server) register(c *gin.Context) {
 	writePair(c, pair)
 }
 
+func (s *Server) register(c *gin.Context) {
+	s.signIn(c)
+}
+
 func (s *Server) playerLogin(c *gin.Context) {
-	s.login(c, token.PrincipalPlayer)
+	s.signIn(c)
 }
 
 func (s *Server) adminLogin(c *gin.Context) {
-	s.login(c, token.PrincipalAdmin)
-}
-
-func (s *Server) login(c *gin.Context, principal string) {
 	var req struct {
 		Channel string `json:"channel"`
 		Target  string `json:"target"`
 		Phone   string `json:"phone"`
-		Email   string `json:"email"`
 		Code    string `json:"code"`
 		SMSCode string `json:"sms_code"`
 	}
@@ -124,6 +113,41 @@ func (s *Server) login(c *gin.Context, principal string) {
 	}
 	channel := req.Channel
 	target := req.Target
+	if target == "" && req.Phone != "" {
+		channel = otp.ChannelPhone
+		target = req.Phone
+	}
+	if channel == "" {
+		channel = otp.ChannelPhone
+	}
+	code := req.Code
+	if code == "" {
+		code = req.SMSCode
+	}
+	pair, err := s.auth.Login(c.Request.Context(), channel, target, code, token.PrincipalAdmin)
+	if err != nil {
+		writeAuthErr(c, err)
+		return
+	}
+	writePair(c, pair)
+}
+
+func parseSignInBody(c *gin.Context) (channel, target, code, nickname string, ok bool) {
+	var req struct {
+		Channel  string `json:"channel"`
+		Target   string `json:"target"`
+		Phone    string `json:"phone"`
+		Email    string `json:"email"`
+		Code     string `json:"code"`
+		SMSCode  string `json:"sms_code"`
+		Nickname string `json:"nickname"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
+		return "", "", "", "", false
+	}
+	channel = req.Channel
+	target = req.Target
 	if target == "" {
 		if req.Phone != "" {
 			channel = otp.ChannelPhone
@@ -136,16 +160,11 @@ func (s *Server) login(c *gin.Context, principal string) {
 	if channel == "" {
 		channel = otp.ChannelPhone
 	}
-	code := req.Code
+	code = req.Code
 	if code == "" {
 		code = req.SMSCode
 	}
-	pair, err := s.auth.Login(c.Request.Context(), channel, target, code, principal)
-	if err != nil {
-		writeAuthErr(c, err)
-		return
-	}
-	writePair(c, pair)
+	return channel, target, code, req.Nickname, true
 }
 
 func (s *Server) wechatLogin(c *gin.Context) {
@@ -304,6 +323,7 @@ func writePair(c *gin.Context, pair *authsvc.TokenPair) {
 		"nickname":           pair.Nickname,
 		"phone":              pair.Phone,
 		"email":              pair.Email,
+		"is_new_user":        pair.IsNewUser,
 		"request_id":         c.GetString("request_id"),
 	})
 }

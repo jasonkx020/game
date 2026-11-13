@@ -105,12 +105,13 @@ make docker-up-prod    # 参考 server/deploy/docker-compose.prod.yml
 | 管理员账号 | 手机 `13800000000`，验证码 `123456`（见 `server/.env` 中 `DEV_SMS_CODE`） |
 | 工程 | [server/web/admin/](server/web/admin/) |
 | 功能 | 仪表盘 KPI、俱乐部管理、Mock 房卡充值、游戏 ops-hooks、伴侣人设 |
+| 协议与接入文档 | http://localhost:5173/docs（**免登录**；OpenAPI / 协议 / 接入指南） |
 
 Admin Web 与 Cocos 客户端共用同一 `platform-api`，请求需 HMAC 签名（见 `docs/tech/openapi/http-signature.md`）。
 
 ## P0 验收流程
 
-1. `POST /v1/auth/login` — body `{"phone":"13800000001","sms_code":"123456"}` + HMAC 签名头
+1. `POST /v1/auth/sign-in` — body `{"phone":"13800000001","sms_code":"123456"}` + HMAC 签名头（打到 auth-api `:8081`；响应含 `is_new_user`）
 2. `POST /v1/rooms` — 开房，获 `room_id` + `ws_url`（房卡消耗读 `game_ops_config`）
 3. Pitaya WS：`game.connector.entry` → `game.connector.bind` → `game.room.join` → `game.room.ready`
 4. `game.dawugui.playcards` / `game.dawugui.pass`
@@ -145,4 +146,7 @@ docs/                   技术与运营文档
 
 ## 文档
 
-技术架构见 [docs/tech/README.md](docs/tech/README.md)。运营手册见 [运营手册.md](运营手册.md)。
+- **在线（推荐）**：[http://localhost:5173/docs](http://localhost:5173/docs) — 后台文档中心（协议、OpenAPI、接入指南）
+- 技术架构：[docs/tech/README.md](docs/tech/README.md)
+- Auth 契约：[auth-service/openapi/](auth-service/openapi/)
+- 运营手册：[运营手册.md](运营手册.md)

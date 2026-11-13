@@ -1,0 +1,15 @@
+bearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: |
+    登录/注册/微信登录后获得的 access_token。
+    用于 `/v1/auth/me`、`/v1/auth/realname/verify`、`/v1/auth/introspect`、`/v1/auth/logout`（也可走 body）。
+
+signatureAuth:
+  type: apiKey
+  in: header
+  name: X-Signature
+  description: |
+    HMAC-SHA256 请求签名，须配合 X-App-Id、X-Timestamp、X-Nonce、X-Content-SHA256。
+    算法见 ../http-signature.md

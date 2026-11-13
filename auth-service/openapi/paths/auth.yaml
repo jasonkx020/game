@@ -1,0 +1,339 @@
+/v1/auth/send-code:
+  post:
+    tags: [Auth]
+    summary: 发送手机/邮箱验证码
+    operationId: authSendCode
+    description: |
+      推荐 `purpose=signin`（`register`/`login` 为兼容别名，行为相同）。
+      只做发码与频控，**不**预检账号是否已注册。
+      Dev 环境可用 DEV_SMS_CODE / DEV_EMAIL_CODE 旁路校验。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/SendCodeRequest'
+    responses:
+      '200':
+        description: 已接受
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/OkResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/auth/sign-in:
+  post:
+    tags: [Auth]
+    summary: 玩家统一登录/注册（phone/email + 验证码）
+    operationId: authSignIn
+    description: |
+      验证码通过后：无号则建号（`is_new_user=true`），有号则登录（`is_new_user=false`）。
+      兼容字段：`phone`+`sms_code` 或 `email`+`code`；`nickname` 仅新用户生效。
+      Admin 请使用 `/v1/admin/auth/login`（不自动建号）。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/SignInRequest'
+    responses:
+      '200':
+        description: 成功（新建或登录）
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/auth/register:
+  post:
+    tags: [Auth]
+    summary: （deprecated）转调 sign-in
+    operationId: authRegister
+    deprecated: true
+    description: |
+      **已废弃**：内部转调 `POST /v1/auth/sign-in`，响应含 `is_new_user`。
+      请改用 `/v1/auth/sign-in`。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RegisterRequest'
+    responses:
+      '200':
+        description: 成功（等同 sign-in）
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/auth/login:
+  post:
+    tags: [Auth]
+    summary: （deprecated）玩家转调 sign-in
+    operationId: authLogin
+    deprecated: true
+    description: |
+      **已废弃（玩家）**：内部转调 `POST /v1/auth/sign-in`，响应含 `is_new_user`。
+      请改用 `/v1/auth/sign-in`。Admin 请用 `/v1/admin/auth/login`。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: 成功（等同 sign-in）
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/auth/oauth/wechat:
+  post:
+    tags: [Auth]
+    summary: 微信登录（web / 小程序由客户端判定）
+    operationId: authWeChatLogin
+    description: |
+      `platform=miniprogram` → jscode2session；
+      `platform=web` → OAuth access_token + userinfo。
+      按 union_id → open_id+platform 绑定；无账户则自动建号并返回 TokenPair。
+      `WECHAT_MODE=mock` 时可用任意 code 本地联调。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/WeChatLoginRequest'
+    responses:
+      '200':
+        description: 登录或自动注册成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/auth/refresh:
+  post:
+    tags: [Auth]
+    summary: 双 Token 刷新
+    operationId: authRefresh
+    description: |
+      Body 必须同时携带 `access_token`（可过期但须验签合法）与 `refresh_token`（合法且未过期）。
+      两者主体一致后轮换发放新 TokenPair。
+      旧 refresh 在宽限窗口（默认约 120s）内仍可再换一次，便于客户端未落盘时重试；窗口外失效。
+      **不要**依赖 Authorization Bearer（避免过期 JWT 被中间件直接 401）。
+      客户端：refresh 超时/失败时用同一对旧 token 重试；成功后立即持久化新的 access+refresh。
+    security:
+      - signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RefreshRequest'
+    responses:
+      '200':
+        description: 刷新成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TokenPair'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/auth/logout:
+  post:
+    tags: [Auth]
+    summary: 注销当前会话 refresh
+    operationId: authLogout
+    description: Authorization Bearer 或 body.access_token（可过期，须验签）。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/LogoutRequest'
+    responses:
+      '200':
+        description: 已注销
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/OkResponse'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/auth/me:
+  get:
+    tags: [Auth]
+    summary: 当前账号基础资料
+    operationId: authMe
+    description: 返回脱敏实名状态；从不返回明文证件号。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: 基础资料
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthProfile'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/auth/realname/verify:
+  post:
+    tags: [Auth]
+    summary: 实名二要素核验（阿里云 Id2MetaVerify）
+    operationId: authRealnameVerify
+    description: |
+      姓名 + 身份证号权威比对。成功写入 realname_status=verified（仅存 hash/脱敏）。
+      `KYC_MODE=mock` 时：合法身份证号即通过；姓名填「拒绝」强制失败。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas.yaml#/RealnameVerifyRequest'
+    responses:
+      '200':
+        description: 核验一致
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthProfile'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        description: 核验不一致（仍可能返回脱敏状态字段）
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/ApiError'
+
+/v1/auth/introspect:
+  get:
+    tags: [Auth]
+    summary: 校验未过期 access 并返回声明摘要
+    operationId: authIntrospect
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    responses:
+      '200':
+        description: Token 有效
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/IntrospectResponse'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

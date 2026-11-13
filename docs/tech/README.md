@@ -1,7 +1,8 @@
 # 技术架构文档索引
 
 > **Go 平台（Gin + OpenAPI）** + **Pitaya 游戏实时层** + **Cocos Creator 3**。  
-> 架构决策：[adr/README.md](adr/README.md)
+> 架构决策：[adr/README.md](adr/README.md)  
+> **在线阅读（推荐）**：运营后台 [`http://localhost:5173/docs`](http://localhost:5173/docs)（免登录，协议与接入文档中心）
 
 ---
 

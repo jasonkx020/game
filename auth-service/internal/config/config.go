@@ -20,6 +20,7 @@ type Config struct {
 	AuthHTTPPort       string
 	AccessTokenExpire  time.Duration
 	RefreshTokenExpire time.Duration
+	RefreshGrace       time.Duration
 	CORSOrigins        []string
 	AdminDevPhone      string
 
@@ -51,6 +52,7 @@ func Load() (*Config, error) {
 	v.SetDefault("AUTH_HTTP_PORT", "8081")
 	v.SetDefault("ACCESS_TOKEN_EXPIRE_MINUTES", 120)
 	v.SetDefault("REFRESH_TOKEN_EXPIRE_DAYS", 90)
+	v.SetDefault("REFRESH_GRACE_SECONDS", 120)
 	v.SetDefault("CORS_ORIGINS", "http://localhost:5173,http://localhost:7456,http://127.0.0.1:7456")
 	v.SetDefault("ADMIN_DEV_PHONE", "13800000000")
 	v.SetDefault("WECHAT_MODE", "mock")
@@ -77,6 +79,10 @@ func Load() (*Config, error) {
 	if refreshDays <= 0 {
 		refreshDays = 90
 	}
+	graceSec := v.GetInt("REFRESH_GRACE_SECONDS")
+	if graceSec <= 0 {
+		graceSec = 120
+	}
 
 	return &Config{
 		DatabaseURL:             v.GetString("DATABASE_URL"),
@@ -89,6 +95,7 @@ func Load() (*Config, error) {
 		AuthHTTPPort:            v.GetString("AUTH_HTTP_PORT"),
 		AccessTokenExpire:       time.Duration(accessMin) * time.Minute,
 		RefreshTokenExpire:      time.Duration(refreshDays) * 24 * time.Hour,
+		RefreshGrace:            time.Duration(graceSec) * time.Second,
 		CORSOrigins:             cors,
 		AdminDevPhone:           v.GetString("ADMIN_DEV_PHONE"),
 		WeChatMode:              v.GetString("WECHAT_MODE"),

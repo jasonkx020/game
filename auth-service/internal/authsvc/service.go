@@ -34,6 +34,7 @@ type TokenPair struct {
 	Nickname         string `json:"nickname,omitempty"`
 	Phone            string `json:"phone,omitempty"`
 	Email            string `json:"email,omitempty"`
+	IsNewUser        bool   `json:"is_new_user"`
 }
 
 type Profile struct {
@@ -58,6 +59,7 @@ type Service struct {
 	wechat          *wechat.Resolver
 	kyc             kyc.Verifier
 	refreshTTL      time.Duration
+	refreshGrace    time.Duration // 轮换后旧 refresh 仍可换票的宽限，缓解客户端未落盘
 	defaultNickname string
 }
 
@@ -68,8 +70,12 @@ func New(
 	wx *wechat.Resolver,
 	verifier kyc.Verifier,
 	refreshTTL time.Duration,
+	refreshGrace time.Duration,
 	defaultNickname string,
 ) *Service {
+	if refreshGrace <= 0 {
+		refreshGrace = 2 * time.Minute
+	}
 	return &Service{
 		store:           st,
 		tokens:          tokens,
@@ -77,6 +83,7 @@ func New(
 		wechat:          wx,
 		kyc:             verifier,
 		refreshTTL:      refreshTTL,
+		refreshGrace:    refreshGrace,
 		defaultNickname: defaultNickname,
 	}
 }
@@ -95,22 +102,12 @@ func (s *Service) SendCode(ctx context.Context, channel, target, purpose string)
 	if target == "" {
 		return fmt.Errorf("%w: target required", ErrBadRequest)
 	}
-	if purpose != otp.PurposeRegister && purpose != otp.PurposeLogin {
+	if purpose == "" {
+		purpose = otp.PurposeSignIn
+	}
+	// signin/login/register：只发码+频控，不预检账号是否存在
+	if _, err := otp.NormalizePurpose(purpose); err != nil {
 		return fmt.Errorf("%w: invalid purpose", ErrBadRequest)
-	}
-
-	if purpose == otp.PurposeRegister {
-		if err := s.ensureTargetFree(ctx, channel, target); err != nil {
-			return err
-		}
-	}
-	if purpose == otp.PurposeLogin {
-		if _, err := s.getByChannel(ctx, channel, target); err != nil {
-			if errors.Is(err, store.ErrNotFound) {
-				return fmt.Errorf("%w: account not found", ErrUnauthorized)
-			}
-			return err
-		}
 	}
 
 	_, err := s.otp.Send(ctx, channel, target, purpose)
@@ -123,8 +120,12 @@ func (s *Service) SendCode(ctx context.Context, channel, target, purpose string)
 	return nil
 }
 
-func (s *Service) Register(ctx context.Context, channel, target, code, nickname string) (*TokenPair, error) {
+// SignIn 玩家统一入口：验证码通过后无号建号、有号登录。
+func (s *Service) SignIn(ctx context.Context, channel, target, code, nickname string) (*TokenPair, error) {
 	channel = strings.ToLower(strings.TrimSpace(channel))
+	if channel == "" {
+		channel = otp.ChannelPhone
+	}
 	target = strings.TrimSpace(target)
 	if channel == otp.ChannelPhone {
 		target = normalizePhone(target)
@@ -136,46 +137,69 @@ func (s *Service) Register(ctx context.Context, channel, target, code, nickname 
 	if target == "" {
 		return nil, fmt.Errorf("%w: target required", ErrBadRequest)
 	}
-	if err := s.otp.Verify(ctx, channel, target, otp.PurposeRegister, code); err != nil {
+	if err := s.otp.Verify(ctx, channel, target, otp.PurposeSignIn, code); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnauthorized, err)
 	}
-	if err := s.ensureTargetFree(ctx, channel, target); err != nil {
+
+	acc, err := s.getByChannel(ctx, channel, target)
+	isNew := false
+	if errors.Is(err, store.ErrNotFound) {
+		nick := strings.TrimSpace(nickname)
+		if nick == "" {
+			if channel == otp.ChannelPhone && len(target) >= 4 {
+				nick = "玩家" + target[len(target)-4:]
+			} else {
+				nick = "玩家"
+			}
+			if s.defaultNickname != "" {
+				nick = s.defaultNickname
+			}
+		}
+		params := store.CreateAccountParams{
+			PrincipalType: token.PrincipalPlayer,
+			Role:          token.RolePlayer,
+			Nickname:      nick,
+		}
+		if channel == otp.ChannelPhone {
+			params.Phone = &target
+		} else {
+			params.Email = &target
+		}
+		acc, err = s.store.CreateAccount(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		isNew = true
+	} else if err != nil {
 		return nil, err
 	}
 
-	nick := strings.TrimSpace(nickname)
-	if nick == "" {
-		if channel == otp.ChannelPhone && len(target) >= 4 {
-			nick = "玩家" + target[len(target)-4:]
-		} else {
-			nick = "玩家"
-		}
-		if s.defaultNickname != "" {
-			nick = s.defaultNickname
-		}
+	if acc.PrincipalType != token.PrincipalPlayer {
+		return nil, fmt.Errorf("%w: principal mismatch", ErrForbidden)
 	}
-
-	params := store.CreateAccountParams{
-		PrincipalType: token.PrincipalPlayer,
-		Role:          token.RolePlayer,
-		Nickname:      nick,
+	if acc.Status != "active" {
+		return nil, fmt.Errorf("%w: account disabled", ErrForbidden)
 	}
-	if channel == otp.ChannelPhone {
-		params.Phone = &target
-	} else {
-		params.Email = &target
-	}
-	acc, err := s.store.CreateAccount(ctx, params)
+	_ = s.store.TouchLogin(ctx, acc.ID)
+	pair, err := s.issuePair(ctx, acc)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.store.TouchLogin(ctx, acc.ID)
-	return s.issuePair(ctx, acc)
+	pair.IsNewUser = isNew
+	return pair, nil
 }
 
-// Login authenticates an existing account (phone or email + code). Admin keeps phone-only.
+// Register deprecated：转调 SignIn。
+func (s *Service) Register(ctx context.Context, channel, target, code, nickname string) (*TokenPair, error) {
+	return s.SignIn(ctx, channel, target, code, nickname)
+}
+
+// Login：玩家转调 SignIn；Admin 仅已有账号登录、不建号。
 func (s *Service) Login(ctx context.Context, channel, target, code, principalType string) (*TokenPair, error) {
-	if principalType != token.PrincipalPlayer && principalType != token.PrincipalAdmin {
+	if principalType == token.PrincipalPlayer {
+		return s.SignIn(ctx, channel, target, code, "")
+	}
+	if principalType != token.PrincipalAdmin {
 		return nil, fmt.Errorf("%w: invalid principal", ErrBadRequest)
 	}
 	channel = strings.ToLower(strings.TrimSpace(channel))
@@ -186,10 +210,7 @@ func (s *Service) Login(ctx context.Context, channel, target, code, principalTyp
 	if channel == otp.ChannelPhone {
 		target = normalizePhone(target)
 	} else if channel == otp.ChannelEmail {
-		if principalType == token.PrincipalAdmin {
-			return nil, fmt.Errorf("%w: admin email login unsupported", ErrBadRequest)
-		}
-		target = normalizeEmail(target)
+		return nil, fmt.Errorf("%w: admin email login unsupported", ErrBadRequest)
 	} else {
 		return nil, fmt.Errorf("%w: invalid channel", ErrBadRequest)
 	}
@@ -197,8 +218,7 @@ func (s *Service) Login(ctx context.Context, channel, target, code, principalTyp
 		return nil, fmt.Errorf("%w: target required", ErrBadRequest)
 	}
 
-	purpose := otp.PurposeLogin
-	if err := s.otp.Verify(ctx, channel, target, purpose, code); err != nil {
+	if err := s.otp.Verify(ctx, channel, target, otp.PurposeSignIn, code); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnauthorized, err)
 	}
 
@@ -209,14 +229,19 @@ func (s *Service) Login(ctx context.Context, channel, target, code, principalTyp
 	if err != nil {
 		return nil, err
 	}
-	if acc.PrincipalType != principalType {
+	if acc.PrincipalType != token.PrincipalAdmin {
 		return nil, fmt.Errorf("%w: principal mismatch", ErrForbidden)
 	}
 	if acc.Status != "active" {
 		return nil, fmt.Errorf("%w: account disabled", ErrForbidden)
 	}
 	_ = s.store.TouchLogin(ctx, acc.ID)
-	return s.issuePair(ctx, acc)
+	pair, err := s.issuePair(ctx, acc)
+	if err != nil {
+		return nil, err
+	}
+	pair.IsNewUser = false
+	return pair, nil
 }
 
 func (s *Service) LoginWeChat(ctx context.Context, platform, code string) (*TokenPair, error) {
@@ -242,6 +267,7 @@ func (s *Service) LoginWeChat(ctx context.Context, platform, code string) (*Toke
 	}
 
 	var acc *store.Account
+	isNew := false
 	if accountID == 0 {
 		nick := id.Nickname
 		if nick == "" {
@@ -259,6 +285,7 @@ func (s *Service) LoginWeChat(ctx context.Context, platform, code string) (*Toke
 		if err := s.store.CreateOAuthIdentity(ctx, acc.ID, wechat.ProviderWeChat, id.Platform, id.OpenID, id.UnionID); err != nil {
 			return nil, err
 		}
+		isNew = true
 	} else {
 		acc, err = s.store.GetAccountByID(ctx, accountID)
 		if err != nil {
@@ -273,7 +300,12 @@ func (s *Service) LoginWeChat(ctx context.Context, platform, code string) (*Toke
 		return nil, fmt.Errorf("%w: account disabled", ErrForbidden)
 	}
 	_ = s.store.TouchLogin(ctx, acc.ID)
-	return s.issuePair(ctx, acc)
+	pair, err := s.issuePair(ctx, acc)
+	if err != nil {
+		return nil, err
+	}
+	pair.IsNewUser = isNew
+	return pair, nil
 }
 
 func (s *Service) VerifyRealname(ctx context.Context, accessToken, realName, idCardNo string) (*Profile, error) {
@@ -403,14 +435,27 @@ func (s *Service) issuePair(ctx context.Context, acc *store.Account) (*TokenPair
 	if err != nil {
 		return nil, err
 	}
-	rawRefresh, err := refreshtoken.NewOpaque()
-	if err != nil {
+	now := time.Now()
+	exp := now.Add(s.refreshTTL)
+	graceUntil := now.Add(s.refreshGrace)
+
+	var rawRefresh string
+	for attempt := 0; attempt < 3; attempt++ {
+		rawRefresh, err = refreshtoken.NewOpaque()
+		if err != nil {
+			return nil, err
+		}
+		err = s.store.UpsertRefresh(ctx, acc.ID, refreshtoken.Hash(rawRefresh), exp, graceUntil)
+		if err == nil {
+			break
+		}
+		// 极端：token_hash 唯一冲突时重生 opaque 再写
+		if store.IsUniqueViolation(err) && attempt < 2 {
+			continue
+		}
 		return nil, err
 	}
-	exp := time.Now().Add(s.refreshTTL)
-	if err := s.store.UpsertRefresh(ctx, acc.ID, refreshtoken.Hash(rawRefresh), exp); err != nil {
-		return nil, err
-	}
+
 	return &TokenPair{
 		AccessToken:      access,
 		RefreshToken:     rawRefresh,
@@ -423,17 +468,6 @@ func (s *Service) issuePair(ctx context.Context, acc *store.Account) (*TokenPair
 		Phone:            acc.PhoneStr(),
 		Email:            acc.EmailStr(),
 	}, nil
-}
-
-func (s *Service) ensureTargetFree(ctx context.Context, channel, target string) error {
-	_, err := s.getByChannel(ctx, channel, target)
-	if err == nil {
-		return fmt.Errorf("%w: already registered", ErrConflict)
-	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return err
-	}
-	return nil
 }
 
 func (s *Service) getByChannel(ctx context.Context, channel, target string) (*store.Account, error) {

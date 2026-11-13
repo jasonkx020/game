@@ -5,6 +5,17 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: () => import('@/views/Login.vue') },
+    // 接入方免登录即可查看协议 / OpenAPI / 接入指南
+    {
+      path: '/docs',
+      component: () => import('@/views/ApiDocs.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/docs/:docId',
+      component: () => import('@/views/ApiDocs.vue'),
+      meta: { public: true },
+    },
     {
       path: '/',
       component: () => import('@/layouts/MainLayout.vue'),
@@ -19,6 +30,11 @@ const router = createRouter({
         { path: 'recharge', component: () => import('@/views/Recharge.vue') },
         { path: 'games', component: () => import('@/views/GameConfig.vue') },
         { path: 'companion', component: () => import('@/views/CompanionPersonas.vue') },
+        {
+          path: 'api-docs',
+          component: () => import('@/views/ApiDocs.vue'),
+          meta: { title: 'API 文档' },
+        },
       ],
     },
   ],
@@ -26,6 +42,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  if (to.meta.public) return
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
     return '/login'
   }

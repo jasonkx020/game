@@ -61,7 +61,7 @@ func main() {
 		WebSecret: cfg.WeChatWebSecret,
 	})
 	verifier := kyc.NewVerifier(cfg.KYCMode, cfg.AliyunAccessKeyID, cfg.AliyunAccessKeySecret, cfg.AliyunCloudauthEndpoint)
-	svc := authsvc.New(st, tokens, otpStore, wx, verifier, cfg.RefreshTokenExpire, "")
+	svc := authsvc.New(st, tokens, otpStore, wx, verifier, cfg.RefreshTokenExpire, cfg.RefreshGrace, "")
 	srv := api.New(cfg, svc, rdb)
 
 	httpSrv := &http.Server{

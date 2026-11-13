@@ -47,12 +47,24 @@ func (f *fakeRepo) getAccount(id int64) (*store.Account, error) {
 	return &cp, nil
 }
 
-func (f *fakeRepo) upsertRefresh(accountID int64, hash string, exp time.Time) {
-	if old, ok := f.m.byAcc[accountID]; ok {
-		delete(f.m.refresh, old)
-	}
+func (f *fakeRepo) upsertRefresh(accountID int64, hash string, exp, graceUntil time.Time) {
 	rec := &store.RefreshRecord{AccountID: accountID, TokenHash: hash, ExpiresAt: exp}
+	if oldHash, ok := f.m.byAcc[accountID]; ok {
+		prev := oldHash
+		until := graceUntil
+		rec.PrevTokenHash = &prev
+		rec.PrevExpiresAt = &until
+		if old, ok := f.m.refresh[oldHash]; ok {
+			delete(f.m.refresh, oldHash)
+			_ = old
+		}
+		// also drop previous prev pointer keys that only lived as current
+	}
 	f.m.refresh[hash] = rec
+	if rec.PrevTokenHash != nil {
+		// allow lookup by prev during grace
+		f.m.refresh[*rec.PrevTokenHash] = rec
+	}
 	f.m.byAcc[accountID] = hash
 }
 
@@ -60,6 +72,12 @@ func (f *fakeRepo) getRefresh(hash string) (*store.RefreshRecord, error) {
 	r, ok := f.m.refresh[hash]
 	if !ok {
 		return nil, store.ErrNotFound
+	}
+	// prev grace check when lookup key is prev
+	if r.TokenHash != hash {
+		if r.PrevTokenHash == nil || *r.PrevTokenHash != hash || r.PrevExpiresAt == nil || time.Now().After(*r.PrevExpiresAt) {
+			return nil, store.ErrNotFound
+		}
 	}
 	cp := *r
 	return &cp, nil
@@ -103,7 +121,7 @@ func dualRefresh(
 	if err != nil {
 		return nil, err
 	}
-	repo.upsertRefresh(acc.ID, refreshtoken.Hash(raw), time.Now().Add(90*24*time.Hour))
+	repo.upsertRefresh(acc.ID, refreshtoken.Hash(raw), time.Now().Add(90*24*time.Hour), time.Now().Add(2*time.Minute))
 	return &authsvc.TokenPair{
 		AccessToken: access, RefreshToken: raw, ExpiresIn: expIn, AccountID: acc.ID, Role: acc.Role,
 	}, nil
@@ -118,7 +136,7 @@ func setup() (*token.Manager, *fakeRepo, string, string) {
 	repo := &fakeRepo{m: m}
 	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7")
 	raw, _ := refreshtoken.NewOpaque()
-	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(24*time.Hour))
+	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(24*time.Hour), time.Now().Add(2*time.Minute))
 	return mgr, repo, access, raw
 }
 
@@ -131,9 +149,29 @@ func TestDualRefreshSuccess(t *testing.T) {
 	if pair.AccessToken == "" || pair.RefreshToken == "" {
 		t.Fatal("empty pair")
 	}
-	// old refresh must be gone
-	if _, err := repo.getRefresh(refreshtoken.Hash(refresh)); !errors.Is(err, store.ErrNotFound) {
-		t.Fatal("old refresh should be rotated away")
+	// old refresh remains resolvable during grace (retry / 未落盘)
+	if _, err := repo.getRefresh(refreshtoken.Hash(refresh)); err != nil {
+		t.Fatal("old refresh should remain valid during grace")
+	}
+}
+
+func TestDualRefreshGraceAllowsRetryWithOldToken(t *testing.T) {
+	mgr, repo, access, refresh := setup()
+	pair1, err := dualRefresh(mgr, repo, access, refresh, token.PrincipalPlayer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// simulate client never persisted pair1; retry with same old refresh
+	pair2, err := dualRefresh(mgr, repo, access, refresh, token.PrincipalPlayer)
+	if err != nil {
+		t.Fatalf("grace retry failed: %v", err)
+	}
+	if pair2.RefreshToken == "" || pair2.RefreshToken == refresh {
+		t.Fatal("expected a new refresh token on grace retry")
+	}
+	if pair2.RefreshToken == pair1.RefreshToken {
+		// allowed but unlikely; ensure we at least got a usable pair
+		t.Log("same refresh as first rotate (acceptable if deterministic)")
 	}
 }
 
@@ -170,7 +208,7 @@ func TestDualRefreshRejectsSubjectMismatch(t *testing.T) {
 func TestDualRefreshRejectsExpiredRefresh(t *testing.T) {
 	mgr, repo, access, _ := setup()
 	raw, _ := refreshtoken.NewOpaque()
-	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(-time.Minute))
+	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(-time.Minute), time.Now().Add(-time.Minute))
 	if _, err := dualRefresh(mgr, repo, access, raw, token.PrincipalPlayer); !errors.Is(err, authsvc.ErrUnauthorized) {
 		t.Fatalf("got %v", err)
 	}
@@ -184,7 +222,7 @@ func TestDualRefreshAllowsExpiredAccess(t *testing.T) {
 	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7")
 	time.Sleep(1100 * time.Millisecond)
 	raw, _ := refreshtoken.NewOpaque()
-	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(time.Hour))
+	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(time.Hour), time.Now().Add(2*time.Minute))
 	pair, err := dualRefresh(mgr, repo, access, raw, token.PrincipalPlayer)
 	if err != nil {
 		t.Fatal(err)

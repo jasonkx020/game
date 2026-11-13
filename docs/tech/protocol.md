@@ -1,7 +1,8 @@
 # 通信协议总览
 
 > **HTTP OpenAPI 3.0** + **Pitaya WebSocket Protobuf** 双通道。  
-> 旧 Envelope 方案已废弃，见 [proto/DEPRECATED.md](proto/DEPRECATED.md)。
+> 旧 Envelope 方案已废弃，见 [proto/DEPRECATED.md](proto/DEPRECATED.md)。  
+> 后台在线查看：`http://localhost:5173/docs`（协议与接入文档中心）。
 
 ---
 

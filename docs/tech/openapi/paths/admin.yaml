@@ -43,65 +43,8 @@
       '403':
         $ref: '../components/responses.yaml#/Forbidden'
 
-/v1/admin/auth/login:
-  post:
-    tags: [Admin]
-    summary: 管理员短信验证码登录（auth-service）
-    operationId: adminAuthLogin
-    description: |
-      由独立 auth-service（默认 `:8081`）提供。账号须已在 auth_accounts（principal_type=admin）中存在。
-      无需 Bearer Token，须 HMAC 签名。
-    security:
-      - signatureAuth: []
-    parameters:
-      - $ref: '../components/parameters.yaml#/XAppId'
-      - $ref: '../components/parameters.yaml#/XTimestamp'
-      - $ref: '../components/parameters.yaml#/XNonce'
-      - $ref: '../components/parameters.yaml#/XContentSha256'
-      - $ref: '../components/parameters.yaml#/XSignature'
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas.yaml#/LoginRequest'
-    responses:
-      '200':
-        description: 登录成功
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas.yaml#/LoginResponse'
-      '401':
-        $ref: '../components/responses.yaml#/SignatureInvalid'
-
-/v1/admin/auth/refresh:
-  post:
-    tags: [Admin]
-    summary: 管理员双 Token 刷新（auth-service）
-    operationId: adminAuthRefresh
-    description: |
-      Body 同时携带 access_token（可过期）与 refresh_token；主体一致后轮换。
-      不依赖 Authorization Bearer。
-    security:
-      - signatureAuth: []
-    parameters:
-      - $ref: '../components/parameters.yaml#/XAppId'
-      - $ref: '../components/parameters.yaml#/XTimestamp'
-      - $ref: '../components/parameters.yaml#/XNonce'
-      - $ref: '../components/parameters.yaml#/XContentSha256'
-      - $ref: '../components/parameters.yaml#/XSignature'
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas.yaml#/RefreshRequest'
-    responses:
-      '200':
-        description: 刷新成功
-      '403':
-        $ref: '../components/responses.yaml#/Forbidden'
+# Admin 登录/refresh/logout 已迁至 auth-service/openapi/paths/admin-auth.yaml
+# （后台文档侧栏「Auth OpenAPI」）
 
 /v1/admin/users:
   get:
