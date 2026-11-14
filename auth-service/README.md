@@ -25,6 +25,8 @@ HMAC 签名头与 GameS `/v1` 一致。
 
 权威契约目录：[openapi/](./openapi/)（入口 `openapi/openapi.yaml`）。
 
+微信 OAuth 表归属与修改约束：[docs/tech/oauth.md](../docs/tech/oauth.md)、仓库规则 `.cursor/rules/oauth.mdc`。
+
 ## 本地
 
 ```bash
@@ -32,6 +34,9 @@ cp .env.example .env
 go run ./cmd/migrate -path migrations
 go run ./cmd/auth-api
 ```
+
+迁移使用独立表 `auth_schema_migrations`（可与 GameS 共用同一 Postgres，互不踩版本号）。  
+若出现 `Dirty database version`：先确认是否误连了游戏库的 `schema_migrations`；用 `go run ./cmd/migrate -path migrations -force <V>` 清 dirty。
 
 默认 `WECHAT_MODE=mock`、`KYC_MODE=mock`、`DEV_SMS_CODE=123456`。
 

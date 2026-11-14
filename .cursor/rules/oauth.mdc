@@ -1,0 +1,40 @@
+---
+description: OAuth/微信登录表归属与修改约束（Auth vs Game）
+globs: auth-service/**/*,docs/tech/oauth.md,docs/tech/auth-service.md,**/oauth/**/*
+alwaysApply: false
+---
+
+# OAuth 修改约束
+
+权威说明：[docs/tech/oauth.md](docs/tech/oauth.md)。改第三方登录前先读该文档。
+
+## 表归属（禁止搞混）
+
+| 表 | 归属 | 允许 |
+| :--- | :--- | :--- |
+| `auth_accounts` | auth-service | 建号种子 nickname/avatar；phone 可空 |
+| `auth_oauth_identities` | auth-service | 存 provider/platform/open_id/union_id |
+| `auth_refresh_tokens` | auth-service | 发 Token 时写入；非 OAuth 明细 |
+| `players` / `admin_users` | server（游戏库） | 仅 `auth_account_id` 软链；**无** OAuth 明细列 |
+
+- **禁止**在 `server/migrations` 或游戏代码中创建/引用 `auth_oauth_*`。
+- **禁止** SQL 跨库 JOIN Auth 表；用 JWT `AccountID` + `EnsureFromAuth`。
+
+## 字段真源
+
+- **phone**：Auth 真源；游戏侧缓存，仅 `EnsureFromAuth` 刷新。
+- **nickname（大厅）**：`players.nickname` 真源；OAuth 昵称只作**新建** Auth/玩家种子。
+- **已存在账号再次 OAuth 登录**：禁止用第三方昵称/头像覆盖 `auth_accounts` 或 `players.nickname`。
+
+## 改代码时
+
+1. 微信解析 / 绑定逻辑：只改 `auth-service/internal/oauth/`、`authsvc`、`store`。
+2. 契约同步：`auth-service/openapi/`。
+3. 新 provider：新迁移 + OpenAPI + 更新 `docs/tech/oauth.md`。
+4. 不要把 `WECHAT_*` 密钥写进仓库或客户端。
+5. 解绑、换绑、账号合并：必须有显式设计与迁移，禁止静默改 `open_id` 唯一语义。
+
+## 客户端
+
+- 大厅展示名：`GET /v1/user/profile`（游戏），不要用 `/v1/auth/me` 的 nickname 覆盖大厅。
+- QQ/Apple 等 UI 占位不等于服务端已支持。

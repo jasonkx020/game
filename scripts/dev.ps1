@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Windows 本地开发脚本（生产构建请用 Makefile / server/deploy/Dockerfile，目标 Linux）
@@ -19,6 +19,12 @@ param(
     [string]$Command = 'help',
     [int]$Steps = 1
 )
+
+# Console UTF-8 so Chinese help renders under Windows PowerShell 5.1
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+    $OutputEncoding = [Console]::OutputEncoding
+} catch { }
 
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

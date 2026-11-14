@@ -32,6 +32,8 @@ func NewService(db *sqlx.DB, jwtSecret, devCode string) *Service {
 }
 
 // EnsureFromAuth links or creates a local player for an auth-service account.
+// phone is Auth-sourced cache (refreshed from claims); nickname is Game-sourced
+// (seeded only on insert, never overwritten for existing rows).
 func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, nickname string) (*Player, error) {
 	if accountID <= 0 {
 		return nil, fmt.Errorf("invalid account id")
@@ -41,6 +43,10 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 		`SELECT id, auth_account_id, phone, nickname, avatar_url, status, last_login_at
 		 FROM players WHERE auth_account_id=$1`, accountID)
 	if err == nil {
+		p, err = s.refreshPhoneCache(ctx, p, phone)
+		if err != nil {
+			return nil, err
+		}
 		s.ensureWallets(ctx, p.ID)
 		return &p, nil
 	}
@@ -49,26 +55,27 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 			`SELECT id, auth_account_id, phone, nickname, avatar_url, status, last_login_at
 			 FROM players WHERE phone=$1`, phone)
 		if err == nil {
-			_, _ = s.db.ExecContext(ctx,
-				`UPDATE players SET auth_account_id=$1, updated_at=$2 WHERE id=$3`, accountID, time.Now(), p.ID)
+			now := time.Now()
+			_, err = s.db.ExecContext(ctx,
+				`UPDATE players SET auth_account_id=$1, phone=$2, updated_at=$3 WHERE id=$4`,
+				accountID, phone, now, p.ID)
+			if err != nil {
+				return nil, err
+			}
 			p.AuthAccountID = &accountID
+			p.Phone = phone
 			s.ensureWallets(ctx, p.ID)
 			return &p, nil
 		}
 	}
-	if nickname == "" && len(phone) >= 4 {
-		nickname = fmt.Sprintf("玩家%s", phone[len(phone)-4:])
-	}
-	if nickname == "" {
-		nickname = fmt.Sprintf("玩家%d", accountID)
-	}
+	seedNick := seedPlayerNickname(nickname, phone, accountID)
 	if phone == "" {
 		phone = fmt.Sprintf("wx-%d", accountID)
 	}
 	err = s.db.QueryRowxContext(ctx,
 		`INSERT INTO players (phone, nickname, auth_account_id) VALUES ($1, $2, $3)
 		 RETURNING id, auth_account_id, phone, nickname, avatar_url, status, last_login_at`,
-		phone, nickname, accountID).StructScan(&p)
+		phone, seedNick, accountID).StructScan(&p)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +83,31 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 	_, _ = s.db.ExecContext(ctx,
 		`UPDATE players SET last_login_at=$1, updated_at=$1 WHERE id=$2`, time.Now(), p.ID)
 	return &p, nil
+}
+
+// refreshPhoneCache updates players.phone from Auth claims without touching nickname.
+func (s *Service) refreshPhoneCache(ctx context.Context, p Player, phone string) (Player, error) {
+	if phone == "" || phone == p.Phone {
+		return p, nil
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE players SET phone=$1, updated_at=$2 WHERE id=$3`,
+		phone, time.Now(), p.ID)
+	if err != nil {
+		return p, err
+	}
+	p.Phone = phone
+	return p, nil
+}
+
+func seedPlayerNickname(nickname, phone string, accountID int64) string {
+	if nickname != "" {
+		return nickname
+	}
+	if len(phone) >= 4 {
+		return fmt.Sprintf("玩家%s", phone[len(phone)-4:])
+	}
+	return fmt.Sprintf("玩家%d", accountID)
 }
 
 func (s *Service) ensureWallets(ctx context.Context, playerID int64) {

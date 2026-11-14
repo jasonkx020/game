@@ -21,6 +21,7 @@
 | 9 | [game-framework.md](game-framework.md) | 游戏逻辑 |
 | 10 | [client-architecture.md](client-architecture.md) | 客户端 |
 | 11 | [adr/006-game-lobby-dynamic-bundle.md](adr/006-game-lobby-dynamic-bundle.md) | 游戏大厅与动态 Bundle |
+| 12 | [auth-service.md](auth-service.md) / [oauth.md](oauth.md) | 独立 Auth、微信 OAuth 与表归属 |
 
 ---
 
@@ -48,6 +49,8 @@ docs/tech/
 ├── client-architecture.md
 ├── protocol.md
 ├── pitaya-client.md
+├── auth-service.md          # 独立 Auth
+├── oauth.md                 # 微信 OAuth 表与约束
 ├── audit-action-log.md      # 有序日志 DDL
 ├── replay.md                # 战绩回放 API
 ├── openapi/                 # HTTP OpenAPI 3.0
@@ -76,6 +79,8 @@ docs/tech/
 | :--- | :--- |
 | [../../README.md](../../README.md) | **本地启动**（含 `client/` Cocos SDK） |
 | [../../client/README.md](../../client/README.md) | 客户端工程与场景挂载 |
+| [auth-service.md](auth-service.md) | 独立 Auth（sign-in / 实名 / Token） |
+| [oauth.md](oauth.md) | 微信 OAuth、涉及表、AI 修改约束 |
 | [games-lobby-migration.md](games-lobby-migration.md) | 独立大厅 App 迁出指南 |
 | [运营手册.md](../../运营手册.md) | 总索引 |
 | [games/README.md](../games/README.md) | 游戏接入 |

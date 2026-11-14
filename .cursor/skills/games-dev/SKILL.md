@@ -108,6 +108,9 @@ docs/tech/              技术文档与 ADR
 **改 HTTP API（登录/钱包/开房/俱乐部）**
 → `docs/tech/openapi/` 改契约 → `server/internal/platform/api/` 实现 → 必要时 `server/migrations/`
 
+**改微信 / OAuth**
+→ 先读 [oauth.md](../../docs/tech/oauth.md) 与 `.cursor/rules/oauth.mdc` → 只改 `auth-service/`（表：`auth_accounts`、`auth_oauth_identities`）→ OpenAPI；**禁止**在游戏库建 OAuth 表或覆盖已有大厅 nickname
+
 **改游戏规则或状态机**
 → `server/internal/game/{id}/` Engine → `server/internal/pitaya/handlers/{id}/` Handler → `server/proto/pitaya/{id}.proto` → `make gen-proto` + `make gen-client-proto`
 

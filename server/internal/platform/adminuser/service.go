@@ -33,7 +33,10 @@ func NewService(db *sqlx.DB, jwtSecret, devCode string) *Service {
 }
 
 // EnsureFromAuth links a local admin_users row to an auth-service account (must already exist by phone).
+// phone is Auth-sourced cache (refreshed from claims); nickname/role on existing rows are not overwritten.
 func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, nickname, role string) (*AdminUser, error) {
+	_ = nickname // Game/admin display nickname is local; claims nickname is ignored after link
+	_ = role     // role stays on admin_users; Auth JWT role is checked separately
 	if accountID <= 0 {
 		return nil, errors.New("invalid account id")
 	}
@@ -42,17 +45,23 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 		`SELECT id, auth_account_id, phone, nickname, role, avatar_url, status, last_login_at
 		 FROM admin_users WHERE auth_account_id=$1`, accountID)
 	if err == nil {
-		return &u, nil
+		return s.refreshAdminPhoneCache(ctx, u, phone)
 	}
 	if phone != "" {
 		err = s.db.GetContext(ctx, &u,
 			`SELECT id, auth_account_id, phone, nickname, role, avatar_url, status, last_login_at
 			 FROM admin_users WHERE phone=$1 AND status='active'`, phone)
 		if err == nil {
-			_, _ = s.db.ExecContext(ctx,
-				`UPDATE admin_users SET auth_account_id=$1, last_login_at=$2, updated_at=$2 WHERE id=$3`,
-				accountID, time.Now(), u.ID)
+			now := time.Now()
+			_, err = s.db.ExecContext(ctx,
+				`UPDATE admin_users SET auth_account_id=$1, phone=$2, last_login_at=$3, updated_at=$3 WHERE id=$4`,
+				accountID, phone, now, u.ID)
+			if err != nil {
+				return nil, err
+			}
 			u.AuthAccountID = &accountID
+			u.Phone = phone
+			u.LastLoginAt = &now
 			return &u, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -60,6 +69,24 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 		}
 	}
 	return nil, sql.ErrNoRows
+}
+
+func (s *Service) refreshAdminPhoneCache(ctx context.Context, u AdminUser, phone string) (*AdminUser, error) {
+	now := time.Now()
+	if phone != "" && phone != u.Phone {
+		_, err := s.db.ExecContext(ctx,
+			`UPDATE admin_users SET phone=$1, last_login_at=$2, updated_at=$2 WHERE id=$3`,
+			phone, now, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		u.Phone = phone
+	} else {
+		_, _ = s.db.ExecContext(ctx,
+			`UPDATE admin_users SET last_login_at=$1, updated_at=$1 WHERE id=$2`, now, u.ID)
+	}
+	u.LastLoginAt = &now
+	return &u, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, adminID int64) (*AdminUser, error) {

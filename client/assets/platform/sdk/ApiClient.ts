@@ -216,6 +216,10 @@ export class ApiClient {
     return this.applyTokenPair(res)
   }
 
+  /**
+   * Auth 账号资料。nickname 仅为 Auth 种子/账号侧字段，**不要**用作大厅展示名；
+   * 大厅花名请用 getProfile / updateProfile（游戏侧真源）。
+   */
   async getAuthMe(): Promise<{
     accountId: number
     nickname: string
@@ -354,6 +358,7 @@ export class ApiClient {
     }
   }
 
+  /** 游戏侧资料：nickname 为大厅花名真源；phone 为 Auth 缓存（脱敏展示）。 */
   async getProfile(): Promise<UserProfile> {
     const res = await this.get<{
       user_id: number
@@ -366,6 +371,7 @@ export class ApiClient {
     return this.mapProfile(res)
   }
 
+  /** 改游戏花名/头像；不可改绑手机号（phone 归 Auth）。 */
   async updateProfile(patch: { nickname?: string; avatarUrl?: string }): Promise<UserProfile> {
     const res = await this.put<{
       user_id: number

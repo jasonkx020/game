@@ -30,6 +30,13 @@ export const docCatalog: DocSection[] = [
         description: '玩家 sign-in / 微信 / 实名 / 双 Token（Admin 仅登录）',
       },
       {
+        id: 'oauth-guide',
+        title: 'OAuth（微信）与表归属',
+        kind: 'markdown',
+        src: '/project-docs/tech/oauth.md',
+        description: 'auth_oauth_identities / 字段落点 / AI 修改约束',
+      },
+      {
         id: 'auth-openapi',
         title: 'Auth OpenAPI',
         kind: 'openapi',

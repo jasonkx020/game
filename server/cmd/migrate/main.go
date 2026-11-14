@@ -80,6 +80,18 @@ func main() {
 		if err := runDown(m, n); err != nil {
 			log.Fatal(err)
 		}
+	case "force":
+		if len(args) < 2 {
+			log.Fatal("usage: migrate force <version>")
+		}
+		v, err := strconv.Atoi(args[1])
+		if err != nil || v < 0 {
+			log.Fatalf("invalid force version %q", args[1])
+		}
+		if err := m.Force(v); err != nil {
+			log.Fatalf("force: %v", err)
+		}
+		fmt.Printf("forced schema_migrations to version %d (dirty=false)\n", v)
 	default:
 		log.Fatalf("unknown command %q", args[0])
 		printUsage()
@@ -93,7 +105,8 @@ func printUsage() {
 commands:
   status          查看当前版本、是否有脏状态、与最新版本差距
   up              升级到最新版本
-  down [N]        回滚 N 步（默认 1）`)
+  down [N]        回滚 N 步（默认 1）
+  force <V>       强制写入版本 V 并清除 dirty（仅人工修复脏库时用）`)
 }
 
 func runStatus(m *migrate.Migrate, available []migrationEntry) error {

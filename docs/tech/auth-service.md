@@ -9,6 +9,16 @@
 
 共享 `JWT_SECRET`、`HMAC_SECRET`、`APP_ID`。
 
+## Phone / Nickname 归属
+
+| 字段 | 真源 | 游戏侧 |
+| :--- | :--- | :--- |
+| **phone** | Auth（`auth_accounts`） | `players.phone` / `admin_users.phone` 仅为缓存；`EnsureFromAuth` 用 JWT claims 刷新，游戏 API 不提供改绑 |
+| **nickname** | Game（`players.nickname` 大厅花名） | 新建玩家时可用 Auth/JWT nickname 作**种子**；已存在行**永不**被 Auth 覆盖；改名走 `PUT /v1/user/profile` |
+
+- `GET /v1/auth/me` 的 `nickname` **不是**大厅展示源；客户端大厅/资料以平台 `GET /v1/user/profile` 为准。
+- 运营后台用户列表读本地表：phone = 缓存（可能短暂滞后于刚换绑），nickname = 游戏展示名。
+
 ## 玩家登录（sign-in）
 
 统一入口：无号建号、有号登录，响应带 `is_new_user`。
@@ -20,7 +30,7 @@
 
 Dev：`DEV_SMS_CODE` / `DEV_EMAIL_CODE` 可直接通过校验。
 
-## 微信登录
+## 微信登录（OAuth）
 
 客户端判断渠道，服务端适配：
 
@@ -33,6 +43,8 @@ POST /v1/auth/oauth/wechat
 - `web` → OAuth access_token + userinfo
 - 按 `union_id` → `open_id+platform` 绑定；无账户则自动建号
 - `WECHAT_MODE=mock` 时用稳定假 openid（本地可测）
+
+**表与字段落点、AI 修改约束**见专文：[oauth.md](oauth.md)（及 `.cursor/rules/oauth.mdc`）。
 
 ## 实名（阿里云二要素）
 
