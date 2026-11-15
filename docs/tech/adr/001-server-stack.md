@@ -44,7 +44,7 @@ Pitaya **不替代** Gin；平台业务与游戏实时分层部署（MVP 可同�
 
 | 进程 | 入口 | 职责 |
 | :--- | :--- | :--- |
-| `cmd/platform-api` | Gin | OpenAPI REST |
+| `cmd/game-api` | Gin | OpenAPI REST |
 | `cmd/game` | Pitaya Standalone | WS + Handler + GameEngine |
 
 ---

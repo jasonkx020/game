@@ -46,4 +46,7 @@ message PlayerSeat {
   string nickname = 3;
   bool ready = 4;
   bool online = 5;
+  // 0=player 1=spectator（与 runtime.SeatRole 对齐）
+  uint32 role = 6;
+  bool trusteeship = 7;
 }

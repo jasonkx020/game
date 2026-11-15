@@ -10,9 +10,10 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 | 组件 | 路径 | 端口 |
 | :--- | :--- | :--- |
 | Auth | `auth-service/cmd/auth-api` | :8081 |
-| HTTP 平台 | `server/cmd/platform-api` | :8080 |
+| 游戏 HTTP | `server/cmd/game-api` | :8080 |
 | Pitaya 游戏 | `server/cmd/game` | :3250 WS |
-| 运营后台 | `server/web/admin/` | :5173 |
+| 运营后台 | `admin/cmd/admin-api`（嵌入 `web/` SPA） | :8082（**非游戏关键路径**） |
+| 运营 HMR（可选） | `admin/web/` Vite | :5173 |
 | Cocos 客户端 | `client/` | Cocos 3.8.8 |
 
 技术栈：Go 1.22+ / Gin + OpenAPI / Pitaya v2 Standalone / PostgreSQL + Redis / Cocos Creator 3 + Vue 3。
@@ -34,13 +35,18 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 
 | 规则 | 说明 |
 | :--- | :--- |
-| `server/internal/platform/*` | **禁止** import `internal/game/{具体游戏}` |
-| `server/internal/game/{id}/` | **禁止** import Pitaya / Gin / Redis |
-| `server/cmd/platform-api` | **禁止** import pitaya handlers |
+| `server/internal/platform/*`、`server/pkg/*` | **禁止** import `internal/game/{具体游戏}` |
+| `server/internal/game/{id}/` | **禁止** import Pitaya / Gin / Redis；**禁止**跨游戏互引 |
+| `server/internal/game/{id}/internal/` | 仅本游戏可引用；对外只暴露 `GameID` / `New` / `NewBotPicker` |
+| `handlers/room`、`pitaya/bot` | 只许 `engine` + `game.Get`/`Bot`；bot 走 `BotPicker` |
+| `server/cmd/game-api` | **禁止** import pitaya handlers；**禁止**依赖 `admin-api` |
+| `admin/` | 运营独立工程；停服不得影响玩家路径 |
 | `server/internal/game/engine` | 仅 interface 与类型，无 IO |
+| `server/internal/pitaya/handlers/room` | 默认禁止改；须 [room-change-checklist](../../docs/tech/room-change-checklist.md) + CODEOWNERS |
 | `server/internal/pitaya/handlers/*` | 薄层：Session/Group/Push/audit，调用 Engine |
 
-**职责分工**：GameEngine = 纯规则（服务端权威）；Pitaya Handler = IO + `commitEvents()` 落库与 Push。
+**职责分工**：GameEngine = 纯规则（服务端权威）；Pitaya Handler = IO + `commitEvents()` 落库与 Push。边界检查：`make lint` / `.\scripts\dev.ps1 lint`。  
+可选能力（Phased / Snapshotter / SpectatorViewer / BotPicker、旁观托管重连）见 [new-game-guide](../../docs/tech/new-game-guide.md) 与 ADR-002。
 
 ## 本地开发命令
 
@@ -50,11 +56,13 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 .\scripts\dev.ps1 up          # Postgres + Redis
 .\scripts\dev.ps1 seed-dev    # 迁移 + 种子
 .\scripts\dev.ps1 gen-proto   # Go proto
-.\scripts\dev.ps1 run-auth    # :8081
-.\scripts\dev.ps1 run-api     # :8080
-.\scripts\dev.ps1 run-game    # :3250
-.\scripts\dev.ps1 run-admin   # :5173（需先 run-auth + run-api）
-.\scripts\dev.ps1 test        # go test ./...
+.\scripts\dev.ps1 run-auth       # :8081
+.\scripts\dev.ps1 run-game-api        # :8080
+.\scripts\dev.ps1 run-game       # :3250
+.\scripts\dev.ps1 run-admin      # :8082 API+SPA（可选；需先 run-auth）
+.\scripts\dev.ps1 run-admin-web  # :5173 HMR（可选；另开 run-admin-api）
+.\scripts\dev.ps1 test           # go test ./...
+.\scripts\dev.ps1 lint           # 游戏模块 import 边界
 ```
 
 ### Linux / macOS
@@ -63,9 +71,11 @@ description: Guides Go/Pitaya/Cocos development for the GameS platform: dual-pro
 make up && make seed-dev
 make gen-proto
 make run-auth   # 终端 1
-make run-api    # 终端 2
+make run-game-api    # 终端 2
 make run-game   # 终端 3
+# 可选：make run-admin   # :8082 API+SPA
 make test
+make lint
 ```
 
 ### Proto 与客户端
@@ -79,7 +89,7 @@ cd client && npm test       # Vitest（不依赖 Cocos 编辑器）
 ### 生产构建
 
 ```bash
-make build-linux    # server/bin/platform-api, server/bin/game
+make build-linux    # server/bin/game-api, server/bin/game
 make docker-build   # Linux 镜像（context=server/）
 ```
 
@@ -88,17 +98,19 @@ make docker-build   # Linux 镜像（context=server/）
 ## 目录地图
 
 ```
-server/                 # Go 后端（独立 go.mod）
-  cmd/platform-api/     Gin HTTP
+auth-service/           # 登录（:8081）
+server/                 # 游戏平台（独立 go.mod）
+  cmd/game-api/     玩家 HTTP :8080
   cmd/game/             Pitaya WS
-  internal/platform/    用户/钱包/房间/俱乐部/metrics/companion
-  internal/game/        GameEngine（每游戏一套）
+  pkg/                  共享领域包（admin replace）
+  internal/platform/    房间/大厅/companion 等
+  internal/game/        GameEngine
   internal/pitaya/      Handler + commitEvents + bot
-  web/admin/            Vue 3 运营后台
-  config/ops-hooks/     游戏运营配置 JSON
-  proto/pitaya/         Protobuf
-  migrations/           PostgreSQL DDL
-  deploy/               docker-compose, Dockerfile
+  migrations/ deploy/
+admin/                  # 运营独立工程
+  cmd/admin-api/        :8082（API + 嵌入 SPA）
+  web/                  Vue 源码
+  internal/webui/       go:embed dist
 client/                 # Cocos + Platform SDK
 docs/tech/              技术文档与 ADR
 ```
@@ -121,7 +133,7 @@ docs/tech/              技术文档与 ADR
 → `server/internal/platform/lobby/` + `server/migrations/` + `LobbyScene.ts` + OpenAPI `lobby.yaml`
 
 **改运营后台**
-→ `server/web/admin/src/`；API 契约见 `docs/tech/openapi/openapi.yaml`
+→ `admin/web/src/` + `admin/internal/api/`（admin-api）；登录仍在 `auth-service`；**禁止**让 game-api/game 依赖 admin-api
 
 **改数据库**
 → `server/migrations/` 新增 up/down；**禁止**修改已发布 proto message 字段编号

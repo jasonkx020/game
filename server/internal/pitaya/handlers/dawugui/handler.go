@@ -9,7 +9,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/component"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/example/game/internal/audit"
+	"github.com/example/game/pkg/audit"
 	"github.com/example/game/internal/game/engine"
 	"github.com/example/game/internal/game"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
@@ -90,7 +90,7 @@ func (h *Handler) apply(ctx context.Context, roomIDStr string, action engine.Act
 			seat.Ready = false
 		}
 	} else {
-		_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
 	}
 
 	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.audit.Next()}
@@ -127,7 +127,7 @@ func (h *Handler) applyPass(ctx context.Context, roomIDStr string) (*pb.PlayCard
 	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.dawugui.pass"); err != nil {
 		return nil, err
 	}
-	_ = bot.RunDawuguiBots(ctx, room, h.committer, h.audit, h.actionLog)
+	_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
 	return &pb.PlayCardsRsp{}, nil
 }
 

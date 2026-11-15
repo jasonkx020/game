@@ -21,6 +21,7 @@ var (
 	ErrBadRequest   = errors.New("bad request")
 	ErrForbidden    = errors.New("forbidden")
 	ErrConflict     = errors.New("conflict")
+	ErrNotFound     = errors.New("not found")
 )
 
 type TokenPair struct {
@@ -416,6 +417,114 @@ func (s *Service) Logout(ctx context.Context, accessToken string) error {
 		return fmt.Errorf("%w: invalid access_token", ErrUnauthorized)
 	}
 	return s.store.DeleteRefreshByAccount(ctx, claims.AccountID)
+}
+
+// SetAccountStatus updates auth_accounts.status (active|disabled) for ops moderation.
+func (s *Service) SetAccountStatus(ctx context.Context, accountID int64, status string) (*store.Account, error) {
+	if accountID <= 0 {
+		return nil, fmt.Errorf("%w: invalid account_id", ErrBadRequest)
+	}
+	if status != "active" && status != "disabled" {
+		return nil, fmt.Errorf("%w: status must be active or disabled", ErrBadRequest)
+	}
+	if err := s.store.UpdateStatus(ctx, accountID, status); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("%w: account not found", ErrNotFound)
+		}
+		return nil, err
+	}
+	acc, err := s.store.GetAccountByID(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("%w: account not found", ErrNotFound)
+		}
+		return nil, err
+	}
+	return acc, nil
+}
+
+// RevokeSessions deletes all refresh tokens for an account (access JWT still expires naturally).
+func (s *Service) RevokeSessions(ctx context.Context, accountID int64) error {
+	if accountID <= 0 {
+		return fmt.Errorf("%w: invalid account_id", ErrBadRequest)
+	}
+	if _, err := s.store.GetAccountByID(ctx, accountID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("%w: account not found", ErrNotFound)
+		}
+		return err
+	}
+	return s.store.DeleteRefreshByAccount(ctx, accountID)
+}
+
+func validAdminRole(role string) bool {
+	switch role {
+	case token.RolePlatformAdmin, token.RoleClubAdmin, "agent":
+		return true
+	default:
+		return false
+	}
+}
+
+// CreateAdminAccount creates principal_type=admin account for ops onboarding.
+func (s *Service) CreateAdminAccount(ctx context.Context, phone, nickname, role string) (*store.Account, error) {
+	phone = normalizePhone(phone)
+	nickname = strings.TrimSpace(nickname)
+	role = strings.TrimSpace(role)
+	if phone == "" || len(phone) < 8 {
+		return nil, fmt.Errorf("%w: invalid phone", ErrBadRequest)
+	}
+	if !validAdminRole(role) {
+		return nil, fmt.Errorf("%w: invalid role", ErrBadRequest)
+	}
+	if nickname == "" {
+		nickname = "管理员"
+	}
+	if _, err := s.store.GetAccountByPhone(ctx, phone); err == nil {
+		return nil, fmt.Errorf("%w: phone already registered", ErrConflict)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
+	p := phone
+	acc, err := s.store.CreateAccount(ctx, store.CreateAccountParams{
+		PrincipalType: token.PrincipalAdmin,
+		Phone:         &p,
+		Role:          role,
+		Nickname:      nickname,
+	})
+	if err != nil {
+		if store.IsUniqueViolation(err) {
+			return nil, fmt.Errorf("%w: phone already registered", ErrConflict)
+		}
+		return nil, err
+	}
+	return acc, nil
+}
+
+// SetAccountRole updates auth_accounts.role for admin principals.
+func (s *Service) SetAccountRole(ctx context.Context, accountID int64, role string) (*store.Account, error) {
+	if accountID <= 0 {
+		return nil, fmt.Errorf("%w: invalid account_id", ErrBadRequest)
+	}
+	role = strings.TrimSpace(role)
+	if !validAdminRole(role) {
+		return nil, fmt.Errorf("%w: invalid role", ErrBadRequest)
+	}
+	acc, err := s.store.GetAccountByID(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("%w: account not found", ErrNotFound)
+		}
+		return nil, err
+	}
+	if acc.PrincipalType != token.PrincipalAdmin {
+		return nil, fmt.Errorf("%w: not an admin account", ErrBadRequest)
+	}
+	if err := s.store.UpdateRole(ctx, accountID, role); err != nil {
+		return nil, err
+	}
+	acc.Role = role
+	return acc, nil
 }
 
 func (s *Service) Introspect(ctx context.Context, accessToken string) (*token.Claims, *store.Account, error) {

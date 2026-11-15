@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/example/game/internal/audit"
-	"github.com/example/game/internal/config"
-	"github.com/example/game/internal/platform/catalog"
+	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/config"
+	"github.com/example/game/pkg/platform/catalog"
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/internal/platform/room"
 )

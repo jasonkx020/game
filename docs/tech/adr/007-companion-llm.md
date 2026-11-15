@@ -18,7 +18,7 @@
 
 ### 服务位置
 
-- MVP：`internal/platform/companion` 并入 `platform-api`
+- MVP：`internal/platform/companion` 并入 `game-api`
 - LLM：OpenAI 兼容 HTTP（`LLM_BASE_URL` + `LLM_API_KEY`）
 - 无 API Key 时：启发式回复 + Tool 直连（开发可用）
 

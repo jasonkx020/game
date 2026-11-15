@@ -1,33 +1,30 @@
-# GameS Server
+# server — 游戏平台
 
-Go 后端：`platform-api`（Gin HTTP）+ `game`（Pitaya WS）。
+双进程：`game-api`（:8080）+ `game`（:3250）。**不含运营后台**（见仓库根目录 [`admin/`](../admin/)）。
 
 ```
-cmd/              入口
-internal/         业务与引擎
-migrations/       PostgreSQL
-proto/            Protobuf（生成到 internal/gen 与 ../client）
-web/admin/        运营后台
-config/ops-hooks/ 游戏运营配置
-deploy/           Docker / compose
+cmd/game-api/              玩家/大厅 HTTP（不依赖 admin-api）
+cmd/game/                  Pitaya WS（单进程注册全部游戏）
+cmd/check-boundaries/      游戏 import 边界检查
+pkg/                       可导出共享领域包（admin-api 通过 replace 引用）
+internal/platform/         房间/大厅/companion/replay 等
+internal/game/engine/      GameEngine / BotPicker / TurnAware
+internal/game/{id}/        游戏公共面（GameID, New, NewBotPicker）
+internal/game/{id}/internal/  游戏私有实现（其他包不可引用）
+internal/game/registry.go  组合根：Get / Bot
+internal/pitaya/handlers/  connector / room / {gameId}
+migrations/
+deploy/
 ```
 
-## 常用命令
+## 增游戏
 
-在仓库根目录：
-
-```powershell
-.\scripts\dev.ps1 run-api
-.\scripts\dev.ps1 run-game
-```
-
-或在本目录：
+白名单见 [ADR-002](../docs/tech/adr/002-pluggable-game-constraints.md)：规则包 + handler + `registry` + `cmd/game` Register + proto。  
+游戏之间**禁止**互相 import；bot 走 `engine.BotPicker`；改公共 room 须 [影响评估](../docs/tech/room-change-checklist.md)。
 
 ```bash
-cp .env.example .env   # 首次
-make up && make seed-dev
-make run-api
-make run-game
+make lint   # go run ./cmd/check-boundaries（+ 可选 golangci-lint）
+make test
 ```
 
-环境变量文件为 **本目录 `.env`**（与 `go.mod` 同级）。
+本地启动见根 [README.md](../README.md)。运营：`.\scripts\dev.ps1 run-admin-api` + `run-admin`。

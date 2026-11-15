@@ -74,12 +74,15 @@ message SettlementEvent {
   optional EventPlayerScore liability = 4;
   int64 rake_amount = 5;
   repeated EventFinalHand final_hands = 6;
+  bool draw = 7;
 }
 
 message EventPlayerScore {
   uint64 user_id = 1;
   uint32 seat = 2;
   int32 rule_score = 3;
+  int32 rank = 4;       // 1-based; 0=unused
+  string team_id = 5;   // empty=unused
 }
 
 message EventFinalHand {

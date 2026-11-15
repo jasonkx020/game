@@ -4,42 +4,54 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/example/game/internal/audit"
 	"github.com/example/game/internal/game"
-	"github.com/example/game/internal/game/dawugui"
 	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/runtime"
+	"github.com/example/game/pkg/audit"
 	"google.golang.org/protobuf/proto"
 )
 
-// RunDawuguiBots executes pending bot turns until a human is on clock or the round ends.
-func RunDawuguiBots(
+// RunPending executes pending bot turns for room.GameID until a human is on
+// clock or the round ends. Uses only engine interfaces — no concrete game imports.
+// Caller must hold room.Lock.
+func RunPending(
 	ctx context.Context,
 	room *runtime.RoomRuntime,
 	committer *commit.Committer,
 	gen *audit.Generator,
 	log *actionlog.Repo,
 ) error {
-	if room.GameID != dawugui.GameID || room.EngineState == nil {
+	if room.EngineState == nil || room.GameID == "" {
 		return nil
 	}
 	eng, err := game.Get(room.GameID)
 	if err != nil {
-		return err
+		return nil
 	}
-	for step := 0; step < 16; step++ {
-		st, ok := room.EngineState.(*dawugui.State)
-		if !ok || st.Phase != 1 { // phasePlaying
+	picker, err := game.Bot(room.GameID)
+	if err != nil {
+		// No BotPicker — trusteeship/bots cannot auto-play; do not error.
+		return nil
+	}
+
+	maxSteps := 64
+	for step := 0; step < maxSteps; step++ {
+		turn, ok := room.EngineState.(engine.TurnAware)
+		if !ok || !turn.IsPlaying() {
 			return nil
 		}
-		uid, ok := UserIDForSeat(room, st.CurrentSeat)
-		if !ok || !IsBot(uid) {
+		seat := turn.TurnSeat()
+		uid, seatInfo, ok := SeatForIndex(room, seat)
+		if !ok {
 			return nil
 		}
-		action, ok := PickDawuguiAction(st, st.CurrentSeat)
+		if !IsBot(uid) && (seatInfo == nil || !seatInfo.Trusteeship) {
+			return nil
+		}
+		action, ok := picker.Pick(room.EngineState, seat)
 		if !ok {
 			return nil
 		}
@@ -48,27 +60,31 @@ func RunDawuguiBots(
 			return nil
 		}
 		room.EngineState = newState
-		route := "game.dawugui.playcards"
-		if action.Kind == engine.ActionPass {
-			route = "game.dawugui.pass"
-		}
-		if err := committer.CommitEventsLocked(ctx, room, events, route); err != nil {
+		if err := committer.CommitEventsLocked(ctx, room, events, picker.ActionRoute(action)); err != nil {
 			return err
 		}
 		if end, ok := eng.CheckRoundEnd(newState); ok {
 			settle, _ := eng.CalcSettlement(newState, end)
+			scoreProto := make([]*pb.EventPlayerScore, len(settle.Scores))
+			for i, sc := range settle.Scores {
+				scoreProto[i] = &pb.EventPlayerScore{
+					UserId: sc.UserID, Seat: sc.Seat, RuleScore: sc.RuleScore,
+					Rank: sc.Rank, TeamId: sc.TeamID,
+				}
+			}
 			settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
-				IsValid: settle.Valid, WinnerId: settle.WinnerID,
+				IsValid: settle.Valid, WinnerId: settle.WinnerID, Scores: scoreProto, Draw: settle.Draw,
 			}}})
 			_ = committer.CommitEventsLocked(ctx, room, []engine.GameEvent{
 				{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
-			}, "game.dawugui.settlement")
+			}, picker.SettlementRoute())
 			payload, _ := json.Marshal(settle)
 			sn := gen.Next()
 			_ = log.InsertSettlement(ctx, room.RoomID, room.RoundID, room.GameID, sn, payload)
 			_ = log.EndRound(ctx, room.RoundID, "ended", []int64{int64(settle.WinnerID)}, sn)
-			for _, seat := range room.Seats {
-				seat.Ready = false
+			for _, si := range room.Seats {
+				si.Ready = false
+				si.Trusteeship = false
 			}
 			return nil
 		}

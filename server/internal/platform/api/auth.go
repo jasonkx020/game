@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/example/game/internal/platform/player"
-	"github.com/example/game/internal/platform/user"
+	"github.com/example/game/pkg/platform/player"
+	"github.com/example/game/pkg/platform/user"
 )
 
 // Player/admin login & refresh live in auth-service (AUTH_HTTP_PORT, default :8081).

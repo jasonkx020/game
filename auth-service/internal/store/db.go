@@ -149,6 +149,34 @@ func (s *Store) TouchLogin(ctx context.Context, id int64) error {
 	return err
 }
 
+// UpdateStatus sets auth_accounts.status (active|disabled).
+func (s *Store) UpdateStatus(ctx context.Context, id int64, status string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE auth_accounts SET status=$1, updated_at=$2 WHERE id=$3`, status, time.Now(), id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateRole sets auth_accounts.role.
+func (s *Store) UpdateRole(ctx context.Context, id int64, role string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE auth_accounts SET role=$1, updated_at=$2 WHERE id=$3`, role, time.Now(), id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) UpdateRealname(ctx context.Context, id int64, status, realName, idHash, idMasked string, birth *time.Time, isMinor bool) error {
 	now := time.Now()
 	_, err := s.db.ExecContext(ctx, `

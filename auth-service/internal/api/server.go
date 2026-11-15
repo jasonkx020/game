@@ -58,6 +58,12 @@ func (s *Server) build() *gin.Engine {
 	v1.POST("/admin/auth/refresh", s.adminRefresh)
 	v1.POST("/admin/auth/logout", s.logout)
 
+	// Ops moderation (platform_admin JWT + HMAC)
+	v1.POST("/admin/auth/accounts", s.createAdminAccount)
+	v1.PATCH("/admin/auth/accounts/:account_id/status", s.patchAccountStatus)
+	v1.PATCH("/admin/auth/accounts/:account_id/role", s.patchAccountRole)
+	v1.POST("/admin/auth/accounts/:account_id/revoke-sessions", s.revokeAccountSessions)
+
 	return r
 }
 
@@ -355,6 +361,8 @@ func writeAuthErr(c *gin.Context, err error) {
 		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": err.Error(), "request_id": c.GetString("request_id")})
 	case errors.Is(err, authsvc.ErrConflict):
 		c.JSON(http.StatusConflict, gin.H{"code": 409, "message": err.Error(), "request_id": c.GetString("request_id")})
+	case errors.Is(err, authsvc.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error(), "request_id": c.GetString("request_id")})
 	default:
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": err.Error(), "request_id": c.GetString("request_id")})
 	}

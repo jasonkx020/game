@@ -11,11 +11,11 @@
       "envFile": "${workspaceFolder}/server/.env"
     },
     {
-      "name": "platform-api",
+      "name": "game-api",
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/server/cmd/platform-api",
+      "program": "${workspaceFolder}/server/cmd/game-api",
       "cwd": "${workspaceFolder}/server",
       "envFile": "${workspaceFolder}/server/.env"
     },
@@ -27,17 +27,31 @@
       "program": "${workspaceFolder}/server/cmd/game",
       "cwd": "${workspaceFolder}/server",
       "envFile": "${workspaceFolder}/server/.env"
+    },
+    {
+      "name": "admin-api",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/admin/cmd/admin-api",
+      "cwd": "${workspaceFolder}/admin",
+      "envFile": "${workspaceFolder}/.env"
     }
   ],
   "compounds": [
     {
-      "name": "Server (auth + api + game)",
-      "configurations": ["auth-api", "platform-api", "game"],
+      "name": "Server (auth + game-api + game)",
+      "configurations": ["auth-api", "game-api", "game"],
       "stopAll": true
     },
     {
-      "name": "Server (api + game)",
-      "configurations": ["platform-api", "game"],
+      "name": "Server (game-api + game)",
+      "configurations": ["game-api", "game"],
+      "stopAll": true
+    },
+    {
+      "name": "Admin (admin-api)",
+      "configurations": ["admin-api"],
       "stopAll": true
     }
   ]

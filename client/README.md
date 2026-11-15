@@ -6,7 +6,7 @@
 
 - Cocos Creator **3.8.8**（`package.json` 中 `creator.version` 已锁定；请用同版本编辑器打开 `client/`）
 - Node.js 18+（运行 Vitest / 生成 proto）
-- 后端 `make run-api` + `make run-game` 已启动
+- 后端 `make run-game-api` + `make run-game` 已启动
 
 ## 代码生成
 
@@ -113,7 +113,7 @@ cd client && node scripts/scaffold-asset-dirs.mjs
 ## 联调流程
 
 1. `make up && make seed-dev`
-2. `make run-api`（:8080）与 `make run-game`（:3250 WS）
+2. `make run-game-api`（:8080）与 `make run-game`（:3250 WS）
 3. 可选：`make serve-bundles`（:8787）
 4. Cocos 运行 Launch 场景
 5. 默认 dev 登录：`13800000001` / `123456`

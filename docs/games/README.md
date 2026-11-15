@@ -12,7 +12,7 @@
 | 2 | 填写运营挂点（**必填游戏金币经济 + 房卡消耗**） | [games/{gameId}/ops-hooks.md](dawugui/ops-hooks.md) |
 | 3 | 在总索引注册 | [运营手册.md](../../运营手册.md) 游戏索引表 |
 | 4 | 开放记分场（可选） | 按游戏逐步上线官方记分场 |
-| 5 | 技术接入（开发） | Pitaya Handler + GameEngine + PitayaClient，见 [tech/adr/](docs/tech/adr/README.md) |
+| 5 | 技术接入（开发） | 见 **[tech/new-game-guide.md](../tech/new-game-guide.md)**（Engine 边界 / Handler / Proto / 客户端） |
 
 ---
 
@@ -60,4 +60,4 @@
 | 视角 | 文档 |
 | :--- | :--- |
 | 运营/模块边界 | [platform/architecture.md](../platform/architecture.md) |
-| 技术实现 | [tech/README.md](../tech/README.md) |
+| 技术实现 | **[tech/new-game-guide.md](../tech/new-game-guide.md)**、[tech/README.md](../tech/README.md) |

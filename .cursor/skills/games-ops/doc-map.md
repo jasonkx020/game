@@ -87,8 +87,8 @@
 
 | 项 | 路径/说明 |
 | :--- | :--- |
-| 代码 | [web/admin/](../../web/admin/) |
-| 启动 | `make run-admin`（需先 `make run-api`） |
+| 代码 | [admin/](../../../admin/)（`web/` + `cmd/admin-api`） |
+| 启动 | `make run-admin`（`:8082` API+SPA；停 admin 不影响游戏） |
 | API 契约 | [docs/tech/openapi/](../../docs/tech/openapi/openapi.yaml) |
 
 ---

@@ -26,10 +26,16 @@ func MarkBotsReady(room *runtime.RoomRuntime) {
 }
 
 func UserIDForSeat(room *runtime.RoomRuntime, seat uint32) (uint64, bool) {
+	uid, _, ok := SeatForIndex(room, seat)
+	return uid, ok
+}
+
+// SeatForIndex returns the player seat at index (spectators ignored).
+func SeatForIndex(room *runtime.RoomRuntime, seat uint32) (uint64, *runtime.Seat, bool) {
 	for uid, s := range room.Seats {
 		if s.Seat == seat && s.Role == runtime.SeatRolePlayer {
-			return uid, true
+			return uid, s, true
 		}
 	}
-	return 0, false
+	return 0, nil, false
 }

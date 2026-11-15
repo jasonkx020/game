@@ -1,0 +1,20 @@
+# Platform room / shared engine — require platform owner review.
+# Team handles are placeholders; replace with real GitHub/Origin teams or users.
+
+/server/internal/pitaya/handlers/room/ @platform-room
+/server/internal/pitaya/runtime/ @platform-room
+/server/internal/pitaya/commit/ @platform-room
+/server/internal/game/engine/ @platform-room
+/server/internal/game/registry.go @platform-room
+/docs/tech/room-change-checklist.md @platform-room
+/docs/tech/adr/002-pluggable-game-constraints.md @platform-room
+
+# Per-game ownership (public surface + nested internal + handler + proto).
+
+/server/internal/game/dawugui/ @game-dawugui
+/server/internal/pitaya/handlers/dawugui/ @game-dawugui
+/server/proto/pitaya/dawugui.proto @game-dawugui
+
+/server/internal/game/liuzichong/ @game-liuzichong
+/server/internal/pitaya/handlers/liuzichong/ @game-liuzichong
+/server/proto/pitaya/liuzichong.proto @game-liuzichong

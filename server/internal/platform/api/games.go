@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/example/game/internal/platform/catalog"
+	"github.com/example/game/pkg/platform/catalog"
 )
 
 func (s *Server) listGames(c *gin.Context) {

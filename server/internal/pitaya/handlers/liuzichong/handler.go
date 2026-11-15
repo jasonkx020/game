@@ -9,7 +9,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/component"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/example/game/internal/audit"
+	"github.com/example/game/pkg/audit"
 	"github.com/example/game/internal/game"
 	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
@@ -89,7 +89,7 @@ func (h *Handler) Move(ctx context.Context, req *pb.MoveReq) (*pb.MoveRsp, error
 			s.Ready = false
 		}
 	} else {
-		_ = bot.RunLiuzichongBots(ctx, room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
 	}
 
 	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.audit.Next()}

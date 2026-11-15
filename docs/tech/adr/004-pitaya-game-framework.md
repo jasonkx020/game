@@ -108,9 +108,18 @@ type GameEngine interface {
     CheckRoundEnd(state GameState) (RoundEnd, bool)
     CalcSettlement(state GameState, end RoundEnd) (SettlementResult, error)
 }
+
+// 可选（type assert；见 ADR-002）
+type Phased interface { Phase() string }
+type Snapshotter interface { Snapshot(state GameState, seat uint32) ([]GameEvent, error) }
+type SpectatorViewer interface { SpectatorState(state GameState) (any, error) }
+type TurnAware interface { TurnSeat() uint32; IsPlaying() bool }
+type BotPicker interface { Pick(...); ActionRoute(...); SettlementRoute() string }
 ```
 
-Proto 契约：[proto/pitaya/event.proto](../proto/pitaya/event.proto)。
+Proto 契约：[proto/pitaya/event.proto](../proto/pitaya/event.proto)、[room.proto](../../server/proto/pitaya/room.proto)（旁观/托管/重连字段）。
+
+房间能力：`Join(as_spectator|rejoin)`、`Trusteeship`、`Sync`；断线 `Online=false`，再 Join 恢复。详情 [new-game-guide](../new-game-guide.md)。
 
 | 职责 | Handler | Engine | ActionLogRepo |
 | :--- | :--- | :--- | :--- |

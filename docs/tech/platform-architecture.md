@@ -14,7 +14,7 @@ flowchart TB
         AdminWeb[运营/代理后台 Web]
     end
     subgraph http [HTTP Layer Gin]
-        PlatformAPI[cmd/platform-api OpenAPI]
+        PlatformAPI[cmd/game-api OpenAPI]
     end
     subgraph pitaya [Pitaya Standalone serverType=game]
         WSAcceptor[WebSocket Acceptor]
@@ -75,7 +75,7 @@ MVP：**两进程**（可同机部署）。
 
 | 包/进程 | 职责 | 对应运营 |
 | :--- | :--- | :--- |
-| `cmd/platform-api` | Gin REST（OpenAPI 3.0） | ops/room-card |
+| `cmd/game-api` | Gin REST（OpenAPI 3.0） | ops/room-card |
 | `cmd/game` | Pitaya Standalone + Handlers | — |
 | `internal/platform/*` | user、wallet、room、club、match、risk | 各 ops 模块 |
 | `internal/pitaya/handlers/*` | connector、room、dawugui 薄层 | — |

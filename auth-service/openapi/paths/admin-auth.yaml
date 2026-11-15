@@ -91,3 +91,163 @@
               $ref: '../components/schemas.yaml#/OkResponse'
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
+
+/v1/admin/auth/accounts:
+  post:
+    tags: [AdminAuth]
+    summary: 创建管理员 Auth 账号
+    operationId: adminAuthCreateAccount
+    description: |
+      创建 `principal_type=admin` 账号。角色限 `platform_admin` / `club_admin` / `agent`。
+      手机号冲突返回 409。仅 `platform_admin`。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [phone, role]
+            properties:
+              phone:
+                type: string
+              nickname:
+                type: string
+              role:
+                type: string
+                enum: [platform_admin, club_admin, agent]
+    responses:
+      '200':
+        description: 已创建
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '409':
+        description: 手机号已存在
+
+/v1/admin/auth/accounts/{account_id}/role:
+  patch:
+    tags: [AdminAuth]
+    summary: 更新管理员 Auth 角色
+    operationId: adminAuthSetAccountRole
+    description: |
+      更新 `auth_accounts.role`（JWT 权限来源）。仅 admin 主体；角色枚举同创建接口。仅 `platform_admin`。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [role]
+            properties:
+              role:
+                type: string
+                enum: [platform_admin, club_admin, agent]
+    responses:
+      '200':
+        description: 已更新
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/auth/accounts/{account_id}/status:
+  patch:
+    tags: [AdminAuth]
+    summary: 设置账号状态（封禁/解封）
+    operationId: adminAuthSetAccountStatus
+    description: |
+      将 `auth_accounts.status` 设为 `active` 或 `disabled`。
+      仅 `platform_admin`。`disabled` 后登录与 refresh 均失败。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [active, disabled]
+              reason:
+                type: string
+    responses:
+      '200':
+        description: 已更新
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/auth/accounts/{account_id}/revoke-sessions:
+  post:
+    tags: [AdminAuth]
+    summary: 吊销账号全部 refresh
+    operationId: adminAuthRevokeSessions
+    description: 删除该账号所有 refresh_token；access JWT 仍存活到过期。仅 platform_admin。
+    security:
+      - signatureAuth: []
+        bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: 已吊销
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/OkResponse'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

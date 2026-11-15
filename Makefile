@@ -1,8 +1,8 @@
-.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto gen-client gen-client-api test test-client tidy run-api run-auth run-game run-admin build-linux docker-build docker-up-prod serve-bundles
+.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto gen-client gen-client-api test lint test-client tidy run-game-api run-auth run-game run-admin-api run-admin run-admin-web build-linux docker-build docker-up-prod serve-bundles
 
 SERVER := server
 
-up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto tidy test run-api run-auth run-game run-admin build-linux docker-build docker-up-prod:
+up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto tidy test lint run-game-api run-auth run-game run-admin-api run-admin run-admin-web build-linux docker-build docker-up-prod:
 	@$(MAKE) -C $(SERVER) $@ STEPS=$(STEPS)
 
 gen-client-proto:

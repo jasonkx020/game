@@ -8,7 +8,7 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v2"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/example/game/internal/audit"
+	"github.com/example/game/pkg/audit"
 	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"

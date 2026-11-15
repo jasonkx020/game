@@ -4,8 +4,9 @@
 
 | 进程 | 职责 |
 | :--- | :--- |
-| `auth-service` (`:8081`) | sign-in / 微信 / 实名 / refresh / logout / me |
-| `platform-api` / Pitaya | 仅校验**未过期** access JWT；懒链接本地 `players` / `admin_users` |
+| `auth-service` (`:8081`) | sign-in / 微信 / 实名 / refresh / logout / me；运营封禁 `auth_accounts.status` |
+| `game-api` / Pitaya | 仅校验**未过期** access JWT；懒链接本地 `players` / `admin_users`；`status!=active` 拒绝 Bind |
+| `admin-api` (`:8082`) | 编排封禁/踢线（调 Auth + Redis `ops:player_kick`）；停服不影响游戏 |
 
 共享 `JWT_SECRET`、`HMAC_SECRET`、`APP_ID`。
 
@@ -58,6 +59,17 @@ Authorization: Bearer <access>
 - Dev：`KYC_MODE=mock`（身份证校验位合法即通过；姓名填 `拒绝` 强制不一致）
 - **不落库明文证件号**；仅 hash / 脱敏字段；`GET /v1/auth/me` 返回 `realname_status`
 
+## 运营账号管理（platform_admin）
+
+| API | 作用 |
+| :--- | :--- |
+| `POST /v1/admin/auth/accounts` | 创建 `principal_type=admin`；body `{phone, nickname, role}`；角色限 `platform_admin`/`club_admin`/`agent`；手机号冲突 409 |
+| `PATCH /v1/admin/auth/accounts/{id}/role` | 更新 `auth_accounts.role`（JWT 权限来源） |
+| `PATCH /v1/admin/auth/accounts/{id}/status` | `active` / `disabled`；禁用后登录与 refresh 均 403 |
+| `POST /v1/admin/auth/accounts/{id}/revoke-sessions` | 删除该账号全部 refresh |
+
+登录禁制与角色真源为 Auth；游戏侧 `players.status` / `admin_users.status|role` 由 admin-api 同步镜像。踢线：admin-api 发布 Redis `ops:player_kick`，game 进程订阅后 `SendKickToUsers`。
+
 ## Refresh（双 Token）
 
 Body 必须同时携带可过期的 `access_token` 与未过期的 `refresh_token`，且主体一致后轮换（新旧 refresh 都会换发）。
@@ -73,7 +85,7 @@ Refresh 只存 SHA-256 hash（明文 32 字节随机）；`token_hash` 唯一约
 - 入口：[auth-service/openapi/openapi.yaml](../../auth-service/openapi/openapi.yaml)
 - 说明：[auth-service/openapi/README.md](../../auth-service/openapi/README.md)
 - 签名：[auth-service/openapi/http-signature.md](../../auth-service/openapi/http-signature.md)
-- **后台在线文档**：运营后台 `http://localhost:5173/docs`（免登录；含协议 / OpenAPI / 接入指南）
+- **后台在线文档**：运营后台 `http://localhost:8082/docs`（免登录；含协议 / OpenAPI / 接入指南）
 
 平台总览 `docs/tech/openapi/openapi.yaml` 仅引用 Auth 路径作索引；**以 auth-service/openapi 为准**。
 

@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 游戏平台 HTTP API
   description: |
-    平台业务 HTTP REST 接口（platform-api，默认 `:8080`），遵循 OpenAPI 3.0。
+    平台业务 HTTP REST 接口（game-api，默认 `:8080`），遵循 OpenAPI 3.0。
     所有请求须携带 HMAC-SHA256 签名 Header，详见 docs/tech/openapi/http-signature.md。
 
     **登录 / sign-in / 微信 / 实名 / refresh** 已迁至独立 auth-service（`:8081`），
@@ -19,7 +19,7 @@ servers:
   - url: https://api-staging.example.com
     description: 预发环境
   - url: http://localhost:8080
-    description: 本地 platform-api
+    description: 本地 game-api
 
 tags:
   - name: User

@@ -76,6 +76,10 @@ paths:
     $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1refresh'
   /v1/admin/auth/logout:
     $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1logout'
+  /v1/admin/auth/accounts/{account_id}/status:
+    $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1accounts~1{account_id}~1status'
+  /v1/admin/auth/accounts/{account_id}/revoke-sessions:
+    $ref: './paths/admin-auth.yaml#/~1v1~1admin~1auth~1accounts~1{account_id}~1revoke-sessions'
 
 components:
   securitySchemes:

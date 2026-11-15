@@ -6,14 +6,14 @@
 .EXAMPLE
   .\scripts\dev.ps1 up
   .\scripts\dev.ps1 seed-dev
-  .\scripts\dev.ps1 run-api
+  .\scripts\dev.ps1 run-game-api
   .\scripts\dev.ps1 run-game
 #>
 param(
     [Parameter(Position = 0)]
     [ValidateSet(
         'help', 'up', 'down', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
-        'run-api', 'run-auth', 'run-game', 'run-admin', 'test', 'tidy',
+        'run-game-api', 'run-auth', 'run-game', 'run-admin-api', 'run-admin', 'run-admin-web', 'test', 'lint', 'tidy',
         'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build', 'serve-bundles'
     )]
     [string]$Command = 'help',
@@ -30,6 +30,7 @@ $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Server = Join-Path $Root 'server'
 $Auth = Join-Path $Root 'auth-service'
+$Admin = Join-Path $Root 'admin'
 $Client = Join-Path $Root 'client'
 
 function Import-DotEnv {
@@ -137,18 +138,21 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 migrate-down    回滚一步（-Steps 2 回滚两步）
   .\scripts\dev.ps1 seed-dev        同 migrate（升级 + 种子已在迁移中）
   .\scripts\dev.ps1 migrate-docker  在 Docker 内执行（可选，需 Docker）
-  .\scripts\dev.ps1 run-api         启动 platform-api (:8080)
+  .\scripts\dev.ps1 run-game-api    启动 game-api (:8080)（玩家路径，不依赖 admin）
   .\scripts\dev.ps1 run-auth        启动 auth-api (:8081) 并应用 auth migrations
   .\scripts\dev.ps1 run-game        启动 Pitaya game (:3250)
-  .\scripts\dev.ps1 run-admin       启动运营后台 (:5173)
+  .\scripts\dev.ps1 run-admin       构建前端并启动 admin-api（:8082，API+SPA 同端口）
+  .\scripts\dev.ps1 run-admin-api   仅启动 admin-api（:8082，需已有 web 构建产物）
+  .\scripts\dev.ps1 run-admin-web   Vite HMR (:5173，需另开 run-admin-api)
   .\scripts\dev.ps1 test            go test ./...（server/）
+  .\scripts\dev.ps1 lint            游戏模块 import 边界检查（server/）
   .\scripts\dev.ps1 gen-proto       生成 Go proto（自动查找 buf.exe）
   .\scripts\dev.ps1 gen-client-proto  生成客户端 TS proto
   .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 server/bin/
   .\scripts\dev.ps1 docker-build    构建 Linux 生产镜像
   .\scripts\dev.ps1 serve-bundles   本地托管游戏 Bundle (:8787)
 
-目录：server/（Go 后端）+ client/（Cocos 客户端）
+目录：server/（游戏）+ auth-service/ + admin/（运营）+ client/
 VS Code: 使用 Run and Debug -> Server (api + game)
 
 Linux 生产: make build-linux / make docker-build，见 server/deploy/
@@ -171,9 +175,9 @@ switch ($Command) {
     'seed-dev' { Invoke-Migrate 'up' }
     'migrate-down' { Invoke-Migrate 'down', "$Steps" }
     'migrate-docker' { Invoke-MigrateDocker 'up' }
-    'run-api' {
+    'run-game-api' {
         Push-Location $Server
-        try { go run ./cmd/platform-api } finally { Pop-Location }
+        try { go run ./cmd/game-api } finally { Pop-Location }
     }
     'run-auth' {
         Import-DotEnv
@@ -198,13 +202,31 @@ switch ($Command) {
         Push-Location $Server
         try { go run ./cmd/game } finally { Pop-Location }
     }
+    'run-admin-api' {
+        Push-Location $Admin
+        try { go run ./cmd/admin-api } finally { Pop-Location }
+    }
     'run-admin' {
-        Push-Location (Join-Path $Server 'web/admin')
+        $web = Join-Path $Admin 'web'
+        Push-Location $web
+        try {
+            if (-not (Test-Path 'node_modules')) { npm install }
+            npm run build
+        } finally { Pop-Location }
+        Push-Location $Admin
+        try { go run ./cmd/admin-api } finally { Pop-Location }
+    }
+    'run-admin-web' {
+        Push-Location (Join-Path $Admin 'web')
         try { npm run dev } finally { Pop-Location }
     }
     'test' {
         Push-Location $Server
         try { go test ./... } finally { Pop-Location }
+    }
+    'lint' {
+        Push-Location $Server
+        try { go run ./cmd/check-boundaries } finally { Pop-Location }
     }
     'tidy' {
         Push-Location $Server
@@ -223,9 +245,9 @@ switch ($Command) {
             $env:GOOS = 'linux'
             $env:GOARCH = 'amd64'
             New-Item -ItemType Directory -Force -Path bin | Out-Null
-            go build -ldflags="-s -w" -o bin/platform-api ./cmd/platform-api
+            go build -ldflags="-s -w" -o bin/game-api ./cmd/game-api
             go build -ldflags="-s -w" -o bin/game ./cmd/game
-            Write-Host "Built server/bin/platform-api, server/bin/game (linux/amd64)"
+            Write-Host "Built server/bin/game-api, server/bin/game (linux/amd64)"
         } finally {
             Pop-Location
         }
@@ -233,9 +255,9 @@ switch ($Command) {
     'docker-build' {
         Push-Location $Server
         try {
-            docker build -f deploy/Dockerfile --target platform-api -t game-platform-api:latest .
+            docker build -f deploy/Dockerfile --target game-api -t game-api:latest .
             docker build -f deploy/Dockerfile --target game -t game-server:latest .
-            Write-Host "Built game-platform-api:latest, game-server:latest (linux/amd64)"
+            Write-Host "Built game-api:latest, game-server:latest (linux/amd64)"
         } finally {
             Pop-Location
         }

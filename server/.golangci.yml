@@ -1,0 +1,64 @@
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - depguard
+
+linters-settings:
+  depguard:
+    rules:
+      no-game-cross-dawugui:
+        list-mode: lax
+        files:
+          - "**/internal/game/dawugui/**/*.go"
+          - "**/internal/pitaya/handlers/dawugui/**/*.go"
+        deny:
+          - pkg: "github.com/example/game/internal/game/liuzichong"
+            desc: dawugui must not import liuzichong
+          - pkg: "github.com/example/game/internal/pitaya/handlers/liuzichong"
+            desc: dawugui handler must not import liuzichong handler
+      no-game-cross-liuzichong:
+        list-mode: lax
+        files:
+          - "**/internal/game/liuzichong/**/*.go"
+          - "**/internal/pitaya/handlers/liuzichong/**/*.go"
+        deny:
+          - pkg: "github.com/example/game/internal/game/dawugui"
+            desc: liuzichong must not import dawugui
+          - pkg: "github.com/example/game/internal/pitaya/handlers/dawugui"
+            desc: liuzichong handler must not import dawugui handler
+      no-platform-concrete-games:
+        list-mode: lax
+        files:
+          - "**/internal/platform/**/*.go"
+          - "**/pkg/**/*.go"
+          - "**/internal/pitaya/handlers/room/**/*.go"
+          - "**/internal/pitaya/bot/**/*.go"
+          - "**/internal/pitaya/runtime/**/*.go"
+          - "**/internal/pitaya/commit/**/*.go"
+        deny:
+          - pkg: "github.com/example/game/internal/game/dawugui"
+            desc: platform/room/bot must use registry+engine, not dawugui
+          - pkg: "github.com/example/game/internal/game/liuzichong"
+            desc: platform/room/bot must use registry+engine, not liuzichong
+      no-game-io:
+        list-mode: lax
+        files:
+          - "**/internal/game/**/*.go"
+        deny:
+          - pkg: "github.com/topfreegames/pitaya"
+            desc: GameEngine must not import Pitaya
+          - pkg: "github.com/topfreegames/pitaya/v2"
+            desc: GameEngine must not import Pitaya
+          - pkg: "github.com/gin-gonic/gin"
+            desc: GameEngine must not import Gin
+
+issues:
+  exclude-rules:
+    # Composition roots may import every concrete game.
+    - path: 'cmd/game/'
+      linters: [depguard]
+    - path: 'internal/game/registry\.go'
+      linters: [depguard]

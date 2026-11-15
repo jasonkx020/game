@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,18 +14,19 @@ import (
 	"github.com/topfreegames/pitaya/v2/serialize/protobuf"
 	"github.com/topfreegames/pitaya/v2/session"
 
-	"github.com/example/game/internal/audit"
-	"github.com/example/game/internal/config"
-	"github.com/example/game/internal/db"
+	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/config"
+	"github.com/example/game/pkg/db"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/handlers/connector"
 	"github.com/example/game/internal/pitaya/handlers/dawugui"
 	"github.com/example/game/internal/pitaya/handlers/liuzichong"
 	roomh "github.com/example/game/internal/pitaya/handlers/room"
+	"github.com/example/game/internal/pitaya/opskick"
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/platform/actionlog"
-	"github.com/example/game/internal/platform/player"
-	iredis "github.com/example/game/internal/redis"
+	"github.com/example/game/pkg/platform/player"
+	iredis "github.com/example/game/pkg/redis"
 )
 
 func main() {
@@ -49,7 +51,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer rdb.Close()
-	_ = rdb
 
 	gen := audit.NewGenerator(cfg.SnowflakeWorkerID)
 	logRepo := actionlog.NewRepo(sqlDB)
@@ -73,6 +74,10 @@ func main() {
 	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB), append([]component.Option{component.WithName("room")}, nameOpts...)...)
 	pitaya.Register(dawugui.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("dawugui")}, nameOpts...)...)
 	pitaya.Register(liuzichong.New(store, committer, gen, logRepo), append([]component.Option{component.WithName("liuzichong")}, nameOpts...)...)
+
+	kickCtx, kickCancel := context.WithCancel(context.Background())
+	defer kickCancel()
+	opskick.StartSubscribe(kickCtx, rdb)
 
 	slog.Info("game server listening", "port", cfg.PitayaWSPort)
 	pitaya.Start()

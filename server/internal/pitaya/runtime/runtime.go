@@ -13,16 +13,17 @@ type SeatRole int
 
 const (
 	SeatRolePlayer SeatRole = iota
-	SeatRoleSpectator // reserved for future observer seats
+	SeatRoleSpectator
 )
 
 type Seat struct {
-	UserID   uint64
-	Seat     uint32
-	Nickname string
-	Ready    bool
-	Online   bool
-	Role     SeatRole
+	UserID      uint64
+	Seat        uint32
+	Nickname    string
+	Ready       bool
+	Online      bool
+	Role        SeatRole
+	Trusteeship bool
 }
 
 type RoomRuntime struct {
@@ -93,7 +94,7 @@ func (r *RoomRuntime) Players() []engine.Player {
 	return out
 }
 
-// PlayerSeats returns proto-ready seat snapshots sorted by seat index.
+// PlayerSeats returns player seat snapshots sorted by seat index.
 func (r *RoomRuntime) PlayerSeats() []Seat {
 	out := make([]Seat, 0, len(r.Seats))
 	for _, s := range r.Seats {
@@ -102,6 +103,21 @@ func (r *RoomRuntime) PlayerSeats() []Seat {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Seat < out[j].Seat })
+	return out
+}
+
+// AllSeats returns all seats including spectators, sorted by seat then role.
+func (r *RoomRuntime) AllSeats() []Seat {
+	out := make([]Seat, 0, len(r.Seats))
+	for _, s := range r.Seats {
+		out = append(out, *s)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Seat != out[j].Seat {
+			return out[i].Seat < out[j].Seat
+		}
+		return out[i].Role < out[j].Role
+	})
 	return out
 }
 
@@ -114,5 +130,29 @@ func (r *RoomRuntime) AllReady(minPlayers int) bool {
 			return false
 		}
 	}
+	return true
+}
+
+// NextSpectatorSeat allocates a high seat index for spectators (does not collide with players).
+func (r *RoomRuntime) NextSpectatorSeat() uint32 {
+	var max uint32
+	for _, s := range r.Seats {
+		if s.Seat >= max {
+			max = s.Seat + 1
+		}
+	}
+	if max < 100 {
+		return 100
+	}
+	return max
+}
+
+// MarkOffline sets Online=false for userID if seated (disconnect hook).
+func (r *RoomRuntime) MarkOffline(userID uint64) bool {
+	s, ok := r.Seats[userID]
+	if !ok {
+		return false
+	}
+	s.Online = false
 	return true
 }

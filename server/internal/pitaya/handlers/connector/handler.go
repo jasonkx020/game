@@ -7,10 +7,10 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v2"
 	"github.com/topfreegames/pitaya/v2/component"
 
-	"github.com/example/game/internal/config"
+	"github.com/example/game/pkg/config"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
-	"github.com/example/game/internal/platform/player"
-	"github.com/example/game/internal/platform/user"
+	"github.com/example/game/pkg/platform/player"
+	"github.com/example/game/pkg/platform/user"
 )
 
 type Handler struct {

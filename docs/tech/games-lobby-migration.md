@@ -33,7 +33,7 @@ server/                       # 平台后端 + Pitaya + migrations
 
 - PlatformSDK：git submodule 或 npm `@games/platform-sdk`
 - GameHostSDK 契约：[game-host-sdk.md](game-host-sdk.md)
-- API：`platform-api` 同一 JWT 与 HMAC
+- API：`game-api` 同一 JWT 与 HMAC
 
 ## 构建
 

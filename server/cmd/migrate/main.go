@@ -15,7 +15,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/example/game/internal/config"
+	"github.com/example/game/pkg/config"
 )
 
 type migrationEntry struct {

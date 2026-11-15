@@ -10,6 +10,7 @@ option go_package = "github.com/example/game/gen/pitaya/room;room";
 message JoinReq {
   string room_id = 1;
   optional string password = 2;
+  bool as_spectator = 3;
 }
 
 message JoinRsp {
@@ -18,6 +19,10 @@ message JoinRsp {
   pitaya.common.RoomMode room_mode = 3;
   uint32 seat = 4;
   repeated pitaya.common.PlayerSeat players = 5;
+  bool rejoined = 6;
+  uint32 role = 7; // 0=player 1=spectator
+  string game_phase = 8; // optional Phased.Phase(); empty if unused
+  repeated SyncPushItem snapshot_pushes = 9; // optional Snapshotter
 }
 
 message ReadyReq {
@@ -33,6 +38,15 @@ message LeaveReq {
 
 message LeaveRsp {}
 
+message TrusteeshipReq {
+  string room_id = 1;
+  bool enabled = 2;
+}
+
+message TrusteeshipRsp {
+  bool enabled = 1;
+}
+
 // 断线补发 — since_action_seq 之后的事件
 message SyncReq {
   string room_id = 1;
@@ -46,6 +60,8 @@ message SyncRsp {
   repeated pitaya.event.GameEvent events = 3;
   // Handler 将 events 转为 Push 下发；或直接带 push_route + serialized push
   repeated SyncPushItem pushes = 4;
+  string game_phase = 5;
+  repeated SyncPushItem snapshot_pushes = 6;
 }
 
 message SyncPushItem {

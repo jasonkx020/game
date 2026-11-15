@@ -1,105 +1,63 @@
 # 新游戏技术接入清单
 
-基于 [docs/games/README.md](../../docs/games/README.md) 与 [ADR-002](../../docs/tech/adr/002-pluggable-game-constraints.md)、[ADR-006](../../docs/tech/adr/006-game-lobby-dynamic-bundle.md)。
+完整说明见 **[docs/tech/new-game-guide.md](../../docs/tech/new-game-guide.md)**。  
+运营侧：[docs/games/README.md](../../docs/games/README.md)。约束：[ADR-002](../../docs/tech/adr/002-pluggable-game-constraints.md)。
 
-参考实现：
-- **dawugui**（打乌龟）— 完整范例：3~5 人扑克、playcards/pass
-- **liuzichong**（六子冲）— 第二游戏：独立 Scene + Board
+参考：`dawugui`、`liuzichong`。单进程 `cmd/game` 注册，不另起 WS。
 
 ---
 
-## 文档层（与 games-ops 协作）
+## 文档层
 
 ```
-- [ ] 编写规则 PRD：{gameId}.md（参考 dawugui.md）
-- [ ] 填写运营挂点：docs/games/{gameId}/ops-hooks.md（§3 游戏金币经济必填）
-- [ ] 在 运营手册.md 游戏层表格注册
-- [ ] 同步 JSON 配置：config/ops-hooks/{gameId}.json
+- [ ] 规则 PRD：{gameId}.md
+- [ ] docs/games/{gameId}/ops-hooks.md（§游戏金币经济必填）
+- [ ] 运营手册.md 游戏索引
+- [ ] （可选）CODEOWNERS @game-{id}
 ```
 
-## 后端 — GameEngine
+## 后端 — GameEngine 公共面 + internal
 
 ```
-- [ ] 创建 server/internal/game/{gameId}/（engine.go, state.go, rules.go 等）
-- [ ] 实现 engine.GameEngine 全部方法（Meta/NewState/ApplyAction/...）
-- [ ] 定义 GameID 常量
-- [ ] 编写 engine_test.go 覆盖核心规则
-- [ ] 确认无 Pitaya/Gin/Redis import
-- [ ] 在 server/internal/game/registry.go 注册 Get() case
+- [ ] server/internal/game/{id}/factory.go（GameID / New / NewBotPicker）
+- [ ] server/internal/game/{id}/internal/rules/ 实现 Engine + 单测
+- [ ] （推荐）TurnAware + BotPicker（托管/bot 代打）
+- [ ] （按需）Phased / Snapshotter / SpectatorViewer；Action.Opcode+Payload；Seed/Rank/TeamID/Draw
+- [ ] 无 Pitaya/Gin；不 import 其他游戏
+- [ ] registry.go：Get + Bot case
 ```
 
-## 后端 — Pitaya Handler
+## 后端 — Handler / Proto / 种子
 
 ```
-- [ ] 创建 server/internal/pitaya/handlers/{gameId}/handler.go
-- [ ] 实现游戏 C2S 路由方法
-- [ ] 调用 Engine + commitEvents() 落库与 Push
-- [ ] 在 server/cmd/game/main.go pitaya.Register(..., WithName("{gameId}"))
-- [ ] Push 含 audit_sn + action_seq
+- [ ] handlers/{id}/handler.go + commitEvents；可调 bot.RunPending
+- [ ] cmd/game Register WithName("{id}")
+- [ ] proto/pitaya/{id}.proto；按需扩展 event.proto（不改旧字段号）
+- [ ] make gen-proto && make gen-client-proto
+- [ ] migration：game_catalog + game_ops_config + game_client_bundle
 ```
 
-## 后端 — 大厅与 Bundle
+## 客户端
 
 ```
-- [ ] game_catalog 种子（migration 或 SQL）
-- [ ] game_client_bundle 种子（bundle_url、entry_scene、version）
-- [ ] 确认 GET /v1/lobby/games 返回新游戏
+- [ ] client/assets/games/{id}/ Module + PushHandler + Bundle 入口
+- [ ] GameModuleRegistry；不改 Lobby 硬编码
+- [ ] cd client && npm test
 ```
-
-## Proto
-
-```
-- [ ] 新增 server/proto/pitaya/{gameId}.proto（不修改已有 message 字段编号）
-- [ ] Route 命名：game.{gameId}.{method}
-- [ ] 扩展 GameEvent oneof（见 ADR-005）
-- [ ] make gen-proto（Go）
-- [ ] make gen-client-proto（TS）
-```
-
-## 客户端（Cocos）
-
-```
-- [ ] client/assets/games/{gameId}/ — Scene 或 Board 组件
-- [ ] {GameId}PushHandler.ts — 映射 Push → UI 事件
-- [ ] {GameId}Module.ts — 注册 GameModuleRegistry（registerPush/entryScene/onPassClick 等）
-- [ ] GameEntry.ts — Bundle 入口
-- [ ] Cocos 编辑器：games/{id}/ 配置为 Remote Bundle
-- [ ] GameBundleManager.loadBuiltinModule 添加 fallback case（开发用）
-- [ ] cd client && npm test 通过
-```
-
-## 平台层（通常不改）
-
-以下路径 **禁止** 为新游戏单独修改（除非平台级变更）：
-
-| 禁止改动 | 说明 |
-| :--- | :--- |
-| `internal/platform/wallet` | 房卡/游戏币逻辑 |
-| `openapi/components/` 公共 schema | 除游戏 config 字段外 |
-| `internal/pitaya/handlers/connector` | 除非平台级变更 |
-| `internal/pitaya/handlers/room` | 除非房间流程变更 |
-| `LobbyScene.ts` 硬编码游戏按钮 | 列表由 API 驱动 |
-
-游戏目录与配置通过 `GET /v1/lobby/games` 与 `GET /v1/games/{id}/config` 读取。
 
 ## 验证
 
 ```
+- [ ] make lint（check-boundaries）
 - [ ] go test ./...
-- [ ] make gen-proto && make gen-client-proto 无报错
-- [ ] P0 流程：login → Lobby 可见新游戏 → 开房 → WS entry/bind/join/ready → 游戏操作
-- [ ] Push 日志含连续 action_seq
-- [ ] 多客户端联调（Cocos 或手动 WS）
+- [ ] P0：login → 大厅 → 开房 → WS join/ready → game.{id}.* → 结算
 ```
 
-## 文件对照表
+## 禁止（默认可不改）
 
-| 层 | 路径 | dawugui 范例 | liuzichong 范例 |
-| :--- | :--- | :--- | :--- |
-| 规则 PRD | `{gameId}.md` | dawugui.md | liuzichong.md |
-| 运营挂点 | docs/games/{id}/ops-hooks.md | dawugui/ | liuzichong/ |
-| Engine | internal/game/{id}/ | dawugui/ | liuzichong/ |
-| Handler | internal/pitaya/handlers/{id}/ | dawugui/ | liuzichong/ |
-| Proto | proto/pitaya/{id}.proto | dawugui.proto | liuzichong.proto |
-| 客户端 Module | client/assets/games/{id}/ | DawuguiModule.ts | LiuzichongModule.ts |
-| Bundle 配置 | game_client_bundle 表 | dawugui | liuzichong |
+| 路径 | 说明 |
+| :--- | :--- |
+| `platform/wallet`、openapi 公共 schema | 平台货币/契约 |
+| `handlers/connector` | 平台连接 |
+| `handlers/room` / `game/engine` | 须 [room-change-checklist](../../docs/tech/room-change-checklist.md) |
+| 其他 `internal/game/{other}/` | 跨游戏互引 |

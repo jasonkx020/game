@@ -7,26 +7,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/example/game/internal/audit"
-	"github.com/example/game/internal/config"
-	"github.com/example/game/internal/platform/adminuser"
-	"github.com/example/game/internal/platform/catalog"
-	"github.com/example/game/internal/platform/club"
+	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/config"
+	"github.com/example/game/pkg/platform/catalog"
+	"github.com/example/game/pkg/platform/club"
 	"github.com/example/game/internal/platform/companion"
-	"github.com/example/game/internal/platform/httpmw"
+	"github.com/example/game/pkg/httpmw"
 	"github.com/example/game/internal/platform/lobby"
-	"github.com/example/game/internal/platform/metrics"
-	"github.com/example/game/internal/platform/player"
+	"github.com/example/game/pkg/platform/player"
 	"github.com/example/game/internal/platform/replay"
 	"github.com/example/game/internal/platform/room"
-	"github.com/example/game/internal/platform/user"
-	"github.com/example/game/internal/platform/wallet"
+	"github.com/example/game/pkg/platform/user"
+	"github.com/example/game/pkg/platform/wallet"
 	goredis "github.com/redis/go-redis/v9"
 )
 
 type Server struct {
 	cfg       *config.Config
-	admins    *adminuser.Service
 	players   *player.Service
 	wallet    *wallet.Service
 	rooms     *room.Service
@@ -34,7 +31,6 @@ type Server struct {
 	catalog   *catalog.Service
 	lobby     *lobby.Service
 	companion *companion.Service
-	metrics   *metrics.Service
 	replay    *replay.Service
 	audit     *audit.Generator
 	rdb       *goredis.Client
@@ -42,7 +38,6 @@ type Server struct {
 
 func New(
 	cfg *config.Config,
-	admins *adminuser.Service,
 	players *player.Service,
 	wallet *wallet.Service,
 	rooms *room.Service,
@@ -50,14 +45,13 @@ func New(
 	catalog *catalog.Service,
 	lobbySvc *lobby.Service,
 	companionSvc *companion.Service,
-	metrics *metrics.Service,
 	replaySvc *replay.Service,
 	gen *audit.Generator,
 	rdb *goredis.Client,
 ) *Server {
 	return &Server{
-		cfg: cfg, admins: admins, players: players, wallet: wallet, rooms: rooms,
-		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc, metrics: metrics,
+		cfg: cfg, players: players, wallet: wallet, rooms: rooms,
+		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc,
 		replay: replaySvc, audit: gen, rdb: rdb,
 	}
 }
@@ -70,12 +64,12 @@ func (s *Server) Register(r *gin.Engine) {
 	}, s.rdb)
 
 	jwtPlayer := httpmw.RequirePrincipalType(s.cfg.JWTSecret, user.PrincipalTypePlayer)
-	jwtAdmin := httpmw.RequirePrincipalType(s.cfg.JWTSecret, user.PrincipalTypeAdmin)
 
 	v1 := r.Group("/v1")
 	v1.Use(sig)
 	{
 		// Auth login/refresh/logout 由独立 auth-service 提供（默认 :8081）
+		// Admin 运营 API 由独立 admin-api 提供（默认 :8082）；本进程不依赖 admin-api。
 
 		clubRead := v1.Group("")
 		clubRead.Use(httpmw.JWT(s.cfg.JWTSecret))
@@ -85,7 +79,6 @@ func (s *Server) Register(r *gin.Engine) {
 			clubRead.GET("/clubs/:club_id/room-card", s.clubPoolBalance)
 		}
 
-		// 运营后台与客户端均可读的目录类接口（admin / player JWT 均可）
 		catalogRead := v1.Group("")
 		catalogRead.Use(httpmw.JWT(s.cfg.JWTSecret))
 		{
@@ -120,30 +113,6 @@ func (s *Server) Register(r *gin.Engine) {
 			auth.GET("/rooms/:room_id", s.getRoom)
 			auth.POST("/rooms/:room_id/join", s.joinRoom)
 		}
-
-		admin := v1.Group("/admin")
-		admin.Use(httpmw.JWT(s.cfg.JWTSecret), jwtAdmin, httpmw.RequireRole(s.cfg.JWTSecret, user.RolePlatformAdmin, user.RoleClubAdmin))
-		{
-			admin.POST("/clubs", s.createClub)
-			admin.POST("/clubs/:club_id/members", s.addClubMember)
-			admin.DELETE("/clubs/:club_id/members/:user_id", s.removeClubMember)
-			admin.POST("/clubs/:club_id/room-card/transfer", s.transferToClubPool)
-
-			admin.GET("/metrics/overview", s.adminMetricsOverview)
-			admin.GET("/metrics/room-cards", s.adminMetricsRoomCards)
-			admin.GET("/clubs", s.adminListClubs)
-
-			admin.GET("/wallet/room-card", s.adminRoomCardBalance)
-			admin.POST("/wallet/room-card/recharge", s.adminMockRecharge)
-			admin.GET("/wallet/recharge/history", s.adminRechargeHistory)
-
-			adminPlatform := admin.Group("")
-			adminPlatform.Use(httpmw.RequireRole(s.cfg.JWTSecret, user.RolePlatformAdmin))
-			{
-				adminPlatform.GET("/users", s.adminListUsers)
-				adminPlatform.GET("/players", s.adminListPlayers)
-			}
-		}
 	}
 }
 
@@ -160,21 +129,6 @@ func (s *Server) playerID(c *gin.Context) (int64, error) {
 	c.Set("user_id", strconv.FormatInt(p.ID, 10))
 	c.Set("auth_account_id", strconv.FormatInt(claims.AccountID, 10))
 	return p.ID, nil
-}
-
-func (s *Server) adminID(c *gin.Context) (int64, error) {
-	claims, err := s.accessClaims(c)
-	if err != nil {
-		return 0, err
-	}
-	u, err := s.admins.EnsureFromAuth(c.Request.Context(), claims.AccountID, claims.Phone, claims.Nickname, claims.Role)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "admin link failed", "request_id": c.GetString("request_id")})
-		return 0, err
-	}
-	c.Set("user_id", strconv.FormatInt(u.ID, 10))
-	c.Set("auth_account_id", strconv.FormatInt(claims.AccountID, 10))
-	return u.ID, nil
 }
 
 func (s *Server) accessClaims(c *gin.Context) (*user.AccessClaims, error) {
@@ -195,10 +149,6 @@ func (s *Server) accessClaims(c *gin.Context) (*user.AccessClaims, error) {
 
 func parseClubID(c *gin.Context) (int64, error) {
 	return strconv.ParseInt(c.Param("club_id"), 10, 64)
-}
-
-func parseTargetUserID(c *gin.Context) (int64, error) {
-	return strconv.ParseInt(c.Param("user_id"), 10, 64)
 }
 
 func (s *Server) createRoom(c *gin.Context) {
