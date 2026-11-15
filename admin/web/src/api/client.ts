@@ -1,4 +1,10 @@
 import { signRequest } from './signature'
+import {
+  accessToken,
+  clearSession,
+  refreshToken as storedRefreshToken,
+  writeSession,
+} from './session'
 
 const appId = import.meta.env.VITE_APP_ID || 'cocos-dev'
 const appSecret = import.meta.env.VITE_HMAC_SECRET || 'dev-hmac-secret-change-me'
@@ -11,23 +17,36 @@ export interface ApiError {
   request_id?: string
 }
 
-function getToken(): string | undefined {
-  return localStorage.getItem('access_token') ?? undefined
+function isAuthFailure(err: ApiError, httpStatus: number): boolean {
+  if (httpStatus === 401) return true
+  return err.code === 1001 || err.code === 401
 }
 
-async function request<T>(
+function isAuthBootstrapPath(path: string): boolean {
+  return (
+    path.includes('/admin/auth/refresh') ||
+    path.includes('/admin/auth/login') ||
+    path.includes('/admin/auth/logout')
+  )
+}
+
+/**
+ * Lowest-level signed HTTP call: HMAC + optional Bearer, no refresh.
+ * All higher helpers go through `request`, which owns refresh.
+ */
+async function signedFetch<T>(
   base: string,
   method: string,
   path: string,
   body?: unknown,
-): Promise<T> {
+): Promise<{ ok: true; data: T } | { ok: false; status: number; err: ApiError }> {
   const bodyStr = body !== undefined ? JSON.stringify(body) : ''
   const signPath = path.startsWith('/v1') ? path : `/v1${path}`
   const headers = await signRequest({
     method,
     path: signPath,
     body: bodyStr || undefined,
-    token: getToken(),
+    token: accessToken(),
     appId,
     appSecret,
   })
@@ -45,18 +64,123 @@ async function request<T>(
   try {
     data = await res.json()
   } catch {
-    if (!res.ok) {
-      throw { code: res.status, message: `HTTP ${res.status}` } as ApiError
+    const err: ApiError = {
+      code: res.ok ? 500 : res.status,
+      message: res.ok ? 'invalid JSON response' : `HTTP ${res.status}`,
     }
-    throw { code: 500, message: 'invalid JSON response' } as ApiError
+    return { ok: false, status: res.status || 500, err }
   }
+
   if (!res.ok) {
     const err = (data && typeof data === 'object' ? data : {}) as ApiError
     if (typeof err.code !== 'number') err.code = res.status
     if (!err.message) err.message = `HTTP ${res.status}`
-    throw err
+    return { ok: false, status: res.status, err }
   }
-  return data as T
+
+  return { ok: true, data: data as T }
+}
+
+/** Single-flight refresh shared by concurrent 401s. */
+let refreshInFlight: Promise<void> | null = null
+
+async function refreshAccessToken(): Promise<void> {
+  if (refreshInFlight) return refreshInFlight
+
+  refreshInFlight = (async () => {
+    const access = accessToken()
+    const refreshTok = storedRefreshToken()
+    if (!access || !refreshTok) {
+      throw { code: 1001, message: 'access_token and refresh_token required' } as ApiError
+    }
+
+    const maxAttempts = 3
+    let lastErr: unknown
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const result = await signedFetch<{
+        access_token: string
+        refresh_token: string
+        user_id: number
+        nickname: string
+        role: string
+      }>(authBase, 'POST', '/admin/auth/refresh', {
+        access_token: access,
+        refresh_token: refreshTok,
+      })
+
+      if (result.ok) {
+        const res = result.data
+        writeSession({
+          accessToken: res.access_token,
+          refreshToken: res.refresh_token,
+          user: {
+            user_id: res.user_id,
+            nickname: res.nickname,
+            role: res.role,
+          },
+        })
+        return
+      }
+
+      lastErr = result.err
+      const code = result.err.code
+      if (code === 1001 || code === 401 || code === 403 || code === 400) {
+        throw result.err
+      }
+      if (attempt === maxAttempts - 1) throw result.err
+      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)))
+    }
+    throw lastErr
+  })().finally(() => {
+    refreshInFlight = null
+  })
+
+  return refreshInFlight
+}
+
+function redirectLogin(): void {
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.assign('/login')
+  }
+}
+
+/**
+ * Base request used by every API call (admin-api + auth-service).
+ * On access expiry (401/1001): refresh once (single-flight) then retry.
+ */
+async function request<T>(
+  base: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const signPath = path.startsWith('/v1') ? path : `/v1${path}`
+  const first = await signedFetch<T>(base, method, path, body)
+  if (first.ok) return first.data
+
+  const canRefresh =
+    !isAuthBootstrapPath(signPath) && isAuthFailure(first.err, first.status)
+
+  if (!canRefresh) {
+    throw first.err
+  }
+
+  try {
+    await refreshAccessToken()
+  } catch {
+    clearSession()
+    redirectLogin()
+    throw first.err
+  }
+
+  const second = await signedFetch<T>(base, method, path, body)
+  if (second.ok) return second.data
+
+  if (isAuthFailure(second.err, second.status)) {
+    clearSession()
+    redirectLogin()
+  }
+  throw second.err
 }
 
 export const api = {
@@ -66,8 +190,13 @@ export const api = {
   delete: <T>(path: string) => request<T>(apiBase, 'DELETE', path),
 }
 
-/** Auth endpoints on independent auth-service */
+/** Auth endpoints on independent auth-service — same base request (refresh included). */
 export const authApi = {
   get: <T>(path: string) => request<T>(authBase, 'GET', path),
   post: <T>(path: string, body?: unknown) => request<T>(authBase, 'POST', path, body),
+}
+
+/** Manual refresh; normally unnecessary — `request` refreshes automatically. */
+export async function refreshSession(): Promise<void> {
+  await refreshAccessToken()
 }
