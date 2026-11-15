@@ -8,8 +8,9 @@ import {
 
 const appId = import.meta.env.VITE_APP_ID || 'cocos-dev'
 const appSecret = import.meta.env.VITE_HMAC_SECRET || 'dev-hmac-secret-change-me'
+// Empty = same origin (nginx gateway :8090, embedded admin :8082 via gateway, or Vite proxy).
 const apiBase = import.meta.env.VITE_API_BASE || ''
-const authBase = import.meta.env.VITE_AUTH_BASE || 'http://localhost:8081'
+const authBase = import.meta.env.VITE_AUTH_BASE || ''
 
 export interface ApiError {
   code: number

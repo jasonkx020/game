@@ -21,6 +21,8 @@
 
 HMAC 签名头与 GameS `/v1` 一致。
 
+单端口对外时由 nginx 分流 `/v1/auth`、`/v1/admin/auth` → 本服务（**勿剥路径**），见 [docs/tech/gateway.md](../docs/tech/gateway.md)。
+
 ## OpenAPI（其他项目接入）
 
 权威契约目录：[openapi/](./openapi/)（入口 `openapi/openapi.yaml`）。

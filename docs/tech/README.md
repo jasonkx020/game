@@ -22,6 +22,7 @@
 | 10 | [client-architecture.md](client-architecture.md) | 客户端 |
 | 11 | [adr/006-game-lobby-dynamic-bundle.md](adr/006-game-lobby-dynamic-bundle.md) | 游戏大厅与动态 Bundle |
 | 12 | [auth-service.md](auth-service.md) / [oauth.md](oauth.md) | 独立 Auth、微信 OAuth 与表归属 |
+| 13 | [gateway.md](gateway.md) | nginx 单端口分流（auth / game / admin） |
 
 ---
 

@@ -44,6 +44,10 @@ Copy-Item server\.env.example server\.env
 # 6. 运营后台（可选；不启也不影响游戏三件套）
 .\scripts\dev.ps1 run-admin      # 构建 Vue 并启动 admin-api :8082（API+SPA）
 
+# 6b. 可选：单端口 HTTP 网关（auth + game-api + admin 同源）
+# docker compose -f deploy/docker-compose.gateway.yml up -d
+# → http://localhost:8090/   见 docs/tech/gateway.md
+
 # 7. 游戏 Bundle 静态服务（可选，按需下载）
 .\scripts\dev.ps1 serve-bundles  # :8787
 ```

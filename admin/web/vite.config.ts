@@ -93,6 +93,15 @@ export default defineConfig({
       allow: [adminRoot, repoRoot, docsDir, authOpenapiDir, platformOpenapiDir],
     },
     proxy: {
+      // Auth/OAuth first (same path rules as deploy/nginx/gateway.conf)
+      '/v1/admin/auth': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      '/v1/auth': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
       '/v1': {
         target: 'http://localhost:8082',
         changeOrigin: true,

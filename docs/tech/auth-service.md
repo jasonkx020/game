@@ -4,7 +4,7 @@
 
 | 进程 | 职责 |
 | :--- | :--- |
-| `auth-service` (`:8081`) | sign-in / 微信 / 实名 / refresh / logout / me；运营封禁 `auth_accounts.status` |
+| `auth-service` (`:8081`) | sign-in / 微信 / 实名 / refresh / logout / me；运营封禁 `auth_accounts.status`；可经 [gateway](gateway.md) 同源暴露 |
 | `game-api` / Pitaya | 仅校验**未过期** access JWT；懒链接本地 `players` / `admin_users`；`status!=active` 拒绝 Bind |
 | `admin-api` (`:8082`) | 编排封禁/踢线（调 Auth + Redis `ops:player_kick`）；停服不影响游戏 |
 

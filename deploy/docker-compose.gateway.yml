@@ -1,0 +1,18 @@
+# Local/gateway-only nginx in front of already-running auth/game/admin on the host.
+# Prerequisites: run-auth (:8081), run-game-api (:8080), run-admin (:8082).
+#
+#   docker compose -f deploy/docker-compose.gateway.yml up -d
+#   open http://localhost:8090/
+#
+# HMAC paths are unchanged (/v1/...); do not strip prefixes.
+
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "${GATEWAY_HTTP_PORT:-8090}:8090"
+    volumes:
+      - ./nginx/gateway.docker.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

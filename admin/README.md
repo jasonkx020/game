@@ -12,15 +12,18 @@
 .\scripts\dev.ps1 run-game-api
 .\scripts\dev.ps1 run-game
 
-# 运营后台（构建前端并启动；浏览器打开 http://localhost:8082/）
+# 运营后台（构建前端并启动）
 .\scripts\dev.ps1 run-admin
 
-# 可选：Vite HMR（需另开 run-admin-api）
+# 推荐：HTTP 网关同源（auth+admin+game-api）→ http://localhost:8090/
+docker compose -f deploy/docker-compose.gateway.yml up -d
+
+# 可选：Vite HMR（需另开 run-admin-api；已 proxy /v1/auth* → :8081）
 .\scripts\dev.ps1 run-admin-api
 .\scripts\dev.ps1 run-admin-web   # :5173
 ```
 
-Admin 登录走 auth-service `:8081`（`/v1/admin/auth/*`）。auth CORS 需包含 `http://localhost:8082`。
+Admin 登录路径仍为 `/v1/admin/auth/*`。`VITE_AUTH_BASE` 默认同源；请用网关 `:8090` 或 Vite `:5173`。若浏览器直连 `:8082` 而无网关，构建前设 `VITE_AUTH_BASE=http://localhost:8081`。详见 [gateway.md](../docs/tech/gateway.md)。
 
 ### 用户管控（platform_admin）
 
