@@ -74,31 +74,34 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Room, error) {
 	useClubPool := p.ClubID != nil && *p.ClubID > 0
 	var pendingPersonalDeduct bool
 	var personalBalBefore int64
-	if useClubPool {
-		var poolBal int64
-		if err := tx.GetContext(ctx, &poolBal,
-			`SELECT balance FROM club_room_card_pool WHERE club_id=$1 FOR UPDATE`, *p.ClubID); err != nil {
-			return nil, err
+	// score_field (RoomCardCost==0) skips room-card deduction entirely.
+	if p.RoomCardCost > 0 {
+		if useClubPool {
+			var poolBal int64
+			if err := tx.GetContext(ctx, &poolBal,
+				`SELECT balance FROM club_room_card_pool WHERE club_id=$1 FOR UPDATE`, *p.ClubID); err != nil {
+				return nil, err
+			}
+			if poolBal < p.RoomCardCost {
+				return nil, ErrInsufficientClubPool
+			}
+			newPool := poolBal - p.RoomCardCost
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE club_room_card_pool SET balance=$1, updated_at=now() WHERE club_id=$2`, newPool, *p.ClubID); err != nil {
+				return nil, err
+			}
+		} else {
+			var bal int64
+			if err := tx.GetContext(ctx, &bal,
+				`SELECT balance FROM wallet_room_card WHERE user_id=$1 FOR UPDATE`, p.OwnerID); err != nil {
+				return nil, err
+			}
+			if bal < p.RoomCardCost {
+				return nil, ErrInsufficientRoomCard
+			}
+			pendingPersonalDeduct = true
+			personalBalBefore = bal
 		}
-		if poolBal < p.RoomCardCost {
-			return nil, ErrInsufficientClubPool
-		}
-		newPool := poolBal - p.RoomCardCost
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE club_room_card_pool SET balance=$1, updated_at=now() WHERE club_id=$2`, newPool, *p.ClubID); err != nil {
-			return nil, err
-		}
-	} else {
-		var bal int64
-		if err := tx.GetContext(ctx, &bal,
-			`SELECT balance FROM wallet_room_card WHERE user_id=$1 FOR UPDATE`, p.OwnerID); err != nil {
-			return nil, err
-		}
-		if bal < p.RoomCardCost {
-			return nil, ErrInsufficientRoomCard
-		}
-		pendingPersonalDeduct = true
-		personalBalBefore = bal
 	}
 
 	var room Room

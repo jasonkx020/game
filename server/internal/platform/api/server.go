@@ -162,6 +162,7 @@ func (s *Server) createRoom(c *gin.Context) {
 		PlayerCount int    `json:"player_count"`
 		ClubID      *int64 `json:"club_id"`
 		FillBots    bool   `json:"fill_bots"`
+		TierID      string `json:"tier_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
@@ -173,6 +174,10 @@ func (s *Server) createRoom(c *gin.Context) {
 	if req.RoomMode == "" {
 		req.RoomMode = "room_card"
 	}
+	if req.RoomMode != "room_card" && req.RoomMode != "score_field" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "room_mode must be room_card or score_field", "request_id": c.GetString("request_id")})
+		return
+	}
 	if req.PlayerCount == 0 {
 		req.PlayerCount = 4
 	}
@@ -180,11 +185,41 @@ func (s *Server) createRoom(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error(), "request_id": c.GetString("request_id")})
 		return
 	}
-	cost, err := s.catalog.RoomCardCost(c.Request.Context(), req.GameID, req.PlayerCount)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
-		return
+
+	var cost int64
+	baseScore := int64(1)
+	cfg := map[string]interface{}{
+		"base_score": baseScore,
+		"fill_bots":  req.FillBots,
 	}
+
+	if req.RoomMode == "score_field" {
+		tier, err := s.catalog.GetTier(c.Request.Context(), req.GameID, req.TierID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "tier_id required for score_field", "request_id": c.GetString("request_id")})
+			return
+		}
+		bal, err := s.wallet.GameCoinBalance(c.Request.Context(), uid, req.GameID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
+			return
+		}
+		if bal < tier.MinCoin {
+			c.JSON(http.StatusConflict, gin.H{"code": 2002, "message": "insufficient game coin for tier", "request_id": c.GetString("request_id")})
+			return
+		}
+		cost = 0
+		baseScore = tier.BaseScore
+		cfg["base_score"] = baseScore
+		cfg["tier_id"] = tier.TierID
+	} else {
+		cost, err = s.catalog.RoomCardCost(c.Request.Context(), req.GameID, req.PlayerCount)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error(), "request_id": c.GetString("request_id")})
+			return
+		}
+	}
+
 	if req.ClubID != nil {
 		if err := s.clubs.RequireMember(c.Request.Context(), *req.ClubID, uid); err != nil {
 			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": err.Error(), "request_id": c.GetString("request_id")})
@@ -195,10 +230,7 @@ func (s *Server) createRoom(c *gin.Context) {
 	auditSN := s.audit.Next()
 	r, err := s.rooms.Create(c.Request.Context(), room.CreateParams{
 		OwnerID: uid, ClubID: req.ClubID, GameID: req.GameID, RoomMode: req.RoomMode,
-		PlayerCount: req.PlayerCount, Config: map[string]interface{}{
-			"base_score": 1,
-			"fill_bots":  req.FillBots,
-		},
+		PlayerCount: req.PlayerCount, Config: cfg,
 		WSURL: s.cfg.PitayaWSURL, IdempotencyKey: idem, RoomCardCost: cost, AuditSN: auditSN,
 	})
 	if err != nil {
@@ -207,11 +239,14 @@ func (s *Server) createRoom(c *gin.Context) {
 	}
 	_ = s.lobby.TouchLastPlayed(c.Request.Context(), uid, req.GameID)
 	c.JSON(http.StatusCreated, gin.H{
-		"room_id":  r.RoomID.String(),
-		"ws_url":   r.WSURL,
-		"game_id":  r.GameID,
-		"audit_sn": auditSN,
-		"cost":     cost,
+		"room_id":        r.RoomID.String(),
+		"ws_url":         r.WSURL,
+		"game_id":        r.GameID,
+		"room_mode":      r.RoomMode,
+		"audit_sn":       auditSN,
+		"cost":           cost,
+		"room_card_cost": cost,
+		"base_score":     baseScore,
 	})
 }
 

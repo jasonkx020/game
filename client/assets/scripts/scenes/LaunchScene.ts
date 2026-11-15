@@ -1,6 +1,7 @@
 import { _decorator, Component, director, EditBox, Label, Node, sys } from 'cc'
 import { buildLaunchUI } from '../../platform/host/LaunchAutoBuilder'
 import { LobbyTheme, setNodeOpacity } from '../../platform/lobby/LobbyUIKit'
+import { applyScreenFit } from '../../platform/lobby/ScreenFit'
 import { resolveOrCreateUICanvas } from '../../platform/lobby/UICanvasHost'
 import { SessionStore } from '../SessionStore'
 
@@ -32,12 +33,46 @@ export class LaunchScene extends Component {
   private built = false
 
   onLoad(): void {
+    applyScreenFit()
     if (this.autoBuildUI) this.mountAutoUI()
   }
 
   start(): void {
     if (this.autoBuildUI && !this.built) this.mountAutoUI()
     this.applyRememberedPhone()
+    void this.tryAutoLogin()
+  }
+
+  /** Refresh token 未过期时恢复会话，跳过重新短信登录 */
+  private async tryAutoLogin(): Promise<void> {
+    if (this.loggingIn) return
+    this.loggingIn = true
+    this.setLoginBusy(true)
+    let networkRetry = false
+    try {
+      const result = await SessionStore.tryRestoreSession()
+      if (result === 'ok') {
+        this.showToast('欢迎回来', SessionStore.login?.nickname || '')
+        director.loadScene('Lobby')
+        return
+      }
+      if (result === 'network') {
+        networkRetry = true
+        this.showToast('网络异常', '请检查网络后点击「重试连接」')
+        return
+      }
+      // none | auth → stay on SMS login
+    } catch (e) {
+      console.warn('[Launch] auto-login skipped', e)
+    } finally {
+      if (!SessionStore.login) {
+        this.setLoginBusy(false)
+        this.loggingIn = false
+        if (networkRetry && this.loginBtnLabel) {
+          this.loginBtnLabel.string = '重试连接'
+        }
+      }
+    }
   }
 
   private mountAutoUI(): void {
@@ -108,6 +143,37 @@ export class LaunchScene extends Component {
 
   async onLoginClick(): Promise<void> {
     if (this.loggingIn) return
+
+    // Network failed during auto-restore: retry refresh without SMS.
+    if (SessionStore.hasPersistedTokens() && this.loginBtnLabel?.string === '重试连接') {
+      this.loggingIn = true
+      this.setLoginBusy(true)
+      let keepRetry = false
+      try {
+        const result = await SessionStore.tryRestoreSession()
+        if (result === 'ok') {
+          this.showToast('欢迎回来', SessionStore.login?.nickname || '')
+          director.loadScene('Lobby')
+          return
+        }
+        if (result === 'network') {
+          keepRetry = true
+          this.showToast('网络异常', '请检查网络后再次点击「重试连接」')
+          return
+        }
+        this.showToast('请重新登录', '登录凭证已失效')
+      } finally {
+        if (!SessionStore.login) {
+          this.setLoginBusy(false)
+          this.loggingIn = false
+          if (this.loginBtnLabel) {
+            this.loginBtnLabel.string = keepRetry ? '重试连接' : '登 录'
+          }
+        }
+      }
+      return
+    }
+
     const phone = (this.phoneInput?.string || '').trim() || '13800000001'
     const code = (this.codeInput?.string || '').trim() || '123456'
 

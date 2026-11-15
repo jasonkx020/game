@@ -63,7 +63,7 @@ message RoundInvalidPush {
 message PlayerScore {
   uint64 user_id = 1;
   uint32 seat = 2;
-  int32 rule_score = 3;
+  int64 rule_score = 3;
 }
 
 message PlayerCoin {

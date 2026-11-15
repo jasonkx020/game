@@ -20,7 +20,10 @@ import (
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/roommeta"
 	"github.com/example/game/internal/pitaya/runtime"
+	"github.com/example/game/internal/pitaya/settleapply"
 	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/platform/settlement"
+	"github.com/example/game/pkg/platform/wallet"
 )
 
 type Handler struct {
@@ -30,13 +33,25 @@ type Handler struct {
 	audit     *audit.Generator
 	actionLog *actionlog.Repo
 	roomMeta  *roommeta.Repo
+	settle    settleapply.Deps
 }
 
-func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, db *sqlx.DB) *Handler {
+func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, db *sqlx.DB, w *wallet.Service, settler *settlement.Service) *Handler {
 	return &Handler{
 		store: store, committer: committer, audit: gen, actionLog: log,
 		roomMeta: roommeta.NewRepo(db),
+		settle: settleapply.Deps{
+			Wallet: w, Settlement: settler, Committer: committer, Audit: gen, ActionLog: log,
+			SkipUser: bot.IsBot,
+		},
 	}
+}
+
+func roomModeProto(mode string) pb.RoomMode {
+	if mode == "score_field" {
+		return pb.RoomMode_SCORE_FIELD
+	}
+	return pb.RoomMode_ROOM_CARD
 }
 
 func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error) {
@@ -61,7 +76,10 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	}
 	gameMeta := eng.Meta()
 
-	room := h.store.GetOrCreate(roomID, meta.GameID, meta.PlayerCount)
+	room := h.store.GetOrCreateWith(roomID, runtime.CreateOpts{
+		GameID: meta.GameID, MaxPlayers: meta.PlayerCount,
+		BaseScore: meta.BaseScore(), RoomMode: meta.NormalizedRoomMode(),
+	})
 	room.Lock()
 	defer room.Unlock()
 
@@ -125,7 +143,7 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	rsp := &pb.JoinRsp{
 		RoomId:   req.RoomId,
 		GameId:   room.GameID,
-		RoomMode: pb.RoomMode_ROOM_CARD,
+		RoomMode: roomModeProto(room.RoomMode),
 		Seat:     seatInfo.Seat,
 		Players:  players,
 		Rejoined: rejoined,
@@ -178,7 +196,7 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 	}
 
 	room.RoundNo++
-	cfgBytes, _ := json.Marshal(map[string]interface{}{"base_score": 1, "seed": room.Config.Seed})
+	cfgBytes, _ := json.Marshal(map[string]interface{}{"base_score": room.Config.BaseScore, "seed": room.Config.Seed})
 	round, err := h.actionLog.CreateRound(ctx, roomID, room.RoundNo, room.GameID, cfgBytes)
 	if err != nil {
 		return nil, pitaya.Error(err, "ROUND")
@@ -195,7 +213,7 @@ func (h *Handler) Ready(ctx context.Context, req *pb.ReadyReq) (*pb.ReadyRsp, er
 		return nil, err
 	}
 	h.pushRoomState(ctx, room, pb.RoomPhase_PLAYING, protoSeats(room))
-	_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
+	_ = bot.RunPending(ctx, room, h.settle)
 	go h.tickRoom(roomID)
 	return &pb.ReadyRsp{}, nil
 }
@@ -249,7 +267,7 @@ func (h *Handler) Trusteeship(ctx context.Context, req *pb.TrusteeshipReq) (*pb.
 	}
 	h.pushRoomState(ctx, room, phase, protoSeats(room))
 	if seat.Trusteeship && room.EngineState != nil {
-		_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunPending(ctx, room, h.settle)
 	}
 	return &pb.TrusteeshipRsp{Enabled: seat.Trusteeship}, nil
 }
@@ -355,7 +373,7 @@ func (h *Handler) tickRoom(roomID uuid.UUID) {
 		if len(events) == 0 {
 			if end, ended := eng.CheckRoundEnd(newState); !ended {
 				_ = end
-				_ = bot.RunPending(context.Background(), room, h.committer, h.audit, h.actionLog)
+				_ = bot.RunPending(context.Background(), room, h.settle)
 				room.Unlock()
 				continue
 			}
@@ -366,38 +384,13 @@ func (h *Handler) tickRoom(roomID uuid.UUID) {
 		room.EngineState = newState
 		if end, ok := eng.CheckRoundEnd(newState); ok {
 			settle, _ := eng.CalcSettlement(newState, end)
-			scoreProto := settlementScores(settle)
-			settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
-				IsValid: settle.Valid, WinnerId: settle.WinnerID, Scores: scoreProto, Draw: settle.Draw,
-			}}})
-			_ = h.committer.CommitEventsLocked(context.Background(), room, []engine.GameEvent{
-				{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
-			}, "game.room.tick")
-			payload, _ := json.Marshal(settle)
-			sn := h.audit.Next()
-			_ = h.actionLog.InsertSettlement(context.Background(), roomID, room.RoundID, room.GameID, sn, payload)
-			_ = h.actionLog.EndRound(context.Background(), room.RoundID, "ended", []int64{int64(settle.WinnerID)}, sn)
-			for _, s := range room.Seats {
-				s.Ready = false
-				s.Trusteeship = false
-			}
+			_ = settleapply.FinishRound(context.Background(), h.settle, room, settle, "game.room.tick")
 			room.Unlock()
 			return
 		}
-		_ = bot.RunPending(context.Background(), room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunPending(context.Background(), room, h.settle)
 		room.Unlock()
 	}
-}
-
-func settlementScores(settle engine.SettlementResult) []*pb.EventPlayerScore {
-	out := make([]*pb.EventPlayerScore, len(settle.Scores))
-	for i, sc := range settle.Scores {
-		out[i] = &pb.EventPlayerScore{
-			UserId: sc.UserID, Seat: sc.Seat, RuleScore: sc.RuleScore,
-			Rank: sc.Rank, TeamId: sc.TeamID,
-		}
-	}
-	return out
 }
 
 func protoSeats(room *runtime.RoomRuntime) []*pb.PlayerSeat {
@@ -423,10 +416,11 @@ func (h *Handler) pushRoomState(ctx context.Context, room *runtime.RoomRuntime, 
 			},
 			GameId: room.GameID,
 		},
-		Phase:    phase,
-		RoomMode: pb.RoomMode_ROOM_CARD,
-		Players:  players,
-		RoundNo:  uint32(room.RoundNo),
+		Phase:     phase,
+		RoomMode:  roomModeProto(room.RoomMode),
+		Players:   players,
+		RoundNo:   uint32(room.RoundNo),
+		BaseScore: room.Config.BaseScore,
 	}
 	_ = pitaya.GroupBroadcast(ctx, "game", room.RoomID.String(), "onRoomState", msg)
 }

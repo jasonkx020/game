@@ -25,10 +25,12 @@ export class LiuzichongScene extends Component {
   }
 
   private tintCanvasBg(canvas: Node): void {
+    const sky = canvas.getChildByName('FullBleedBg')
+    if (sky) sky.active = false
     const cam =
       canvas.getComponent(Canvas)?.cameraComponent ?? canvas.getComponentInChildren(Camera)
     if (cam) {
-      // 暖色纸底，避免默认黑清屏看起来像「没画面」
+      // 暖色纸底满屏清屏色（FIXED_HEIGHT 下无黑边）
       cam.clearColor = new Color(0xe8, 0xd8, 0xbc, 255)
     }
   }

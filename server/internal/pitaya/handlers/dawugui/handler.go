@@ -2,33 +2,39 @@ package dawugui
 
 import (
 	"context"
-	"encoding/json"
+	"strconv"
 
 	"github.com/google/uuid"
 	pitaya "github.com/topfreegames/pitaya/v2"
 	"github.com/topfreegames/pitaya/v2/component"
-	"google.golang.org/protobuf/proto"
 
-	"github.com/example/game/pkg/audit"
-	"github.com/example/game/internal/game/engine"
 	"github.com/example/game/internal/game"
+	"github.com/example/game/internal/game/engine"
 	pb "github.com/example/game/internal/gen/pitaya/pitaya"
 	"github.com/example/game/internal/platform/actionlog"
 	"github.com/example/game/internal/pitaya/bot"
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/runtime"
+	"github.com/example/game/internal/pitaya/settleapply"
+	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/platform/settlement"
+	"github.com/example/game/pkg/platform/wallet"
 )
 
 type Handler struct {
 	component.Base
-	store     *runtime.Store
-	committer *commit.Committer
-	audit     *audit.Generator
-	actionLog *actionlog.Repo
+	store  *runtime.Store
+	settle settleapply.Deps
 }
 
-func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo) *Handler {
-	return &Handler{store: store, committer: committer, audit: gen, actionLog: log}
+func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, w *wallet.Service, settler *settlement.Service) *Handler {
+	return &Handler{
+		store: store,
+		settle: settleapply.Deps{
+			Wallet: w, Settlement: settler, Committer: committer, Audit: gen, ActionLog: log,
+			SkipUser: bot.IsBot,
+		},
+	}
 }
 
 func (h *Handler) Playcards(ctx context.Context, req *pb.PlayCardsReq) (*pb.PlayCardsRsp, error) {
@@ -70,30 +76,18 @@ func (h *Handler) apply(ctx context.Context, roomIDStr string, action engine.Act
 		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = newState
-	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.dawugui.playcards"); err != nil {
+	if err := h.settle.Committer.CommitEventsLocked(ctx, room, events, "game.dawugui.playcards"); err != nil {
 		return nil, err
 	}
 
 	if end, ok := eng.CheckRoundEnd(newState); ok {
 		settle, _ := eng.CalcSettlement(newState, end)
-		settleEv, _ := proto.Marshal(&pb.GameEvent{Body: &pb.GameEvent_Settlement{Settlement: &pb.SettlementEvent{
-			IsValid: settle.Valid, WinnerId: settle.WinnerID,
-		}}})
-		_ = h.committer.CommitEventsLocked(ctx, room, []engine.GameEvent{
-			{Type: engine.EventSettlement, PushRoute: "onSettlement", Payload: settleEv},
-		}, "game.dawugui.settlement")
-		payload, _ := json.Marshal(settle)
-		sn := h.audit.Next()
-		_ = h.actionLog.InsertSettlement(ctx, roomID, room.RoundID, room.GameID, sn, payload)
-		_ = h.actionLog.EndRound(ctx, room.RoundID, "ended", []int64{int64(settle.WinnerID)}, sn)
-		for _, seat := range room.Seats {
-			seat.Ready = false
-		}
+		_ = settleapply.FinishRound(ctx, h.settle, room, settle, "game.dawugui.settlement")
 	} else {
-		_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
+		_ = bot.RunPending(ctx, room, h.settle)
 	}
 
-	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.audit.Next()}
+	meta := &pb.EventMeta{ActionSeq: uint32(room.ActionSeq), AuditSn: h.settle.Audit.Next()}
 	if len(events) > 0 {
 		meta.ActionSeq = uint32(room.ActionSeq - len(events) + 1)
 	}
@@ -118,25 +112,28 @@ func (h *Handler) applyPass(ctx context.Context, roomIDStr string) (*pb.PlayCard
 	if !ok {
 		return nil, pitaya.Error(nil, "SEAT")
 	}
-	eng, _ := game.Get(room.GameID)
+	eng, err := game.Get(room.GameID)
+	if err != nil {
+		return nil, err
+	}
 	newState, events, err := eng.ApplyAction(room.EngineState, engine.Action{Kind: engine.ActionPass, Seat: seat.Seat})
 	if err != nil {
 		return nil, pitaya.Error(err, "GAME")
 	}
 	room.EngineState = newState
-	if err := h.committer.CommitEventsLocked(ctx, room, events, "game.dawugui.pass"); err != nil {
+	if err := h.settle.Committer.CommitEventsLocked(ctx, room, events, "game.dawugui.pass"); err != nil {
 		return nil, err
 	}
-	_ = bot.RunPending(ctx, room, h.committer, h.audit, h.actionLog)
-	return &pb.PlayCardsRsp{}, nil
+	if end, ok := eng.CheckRoundEnd(newState); ok {
+		settle, _ := eng.CalcSettlement(newState, end)
+		_ = settleapply.FinishRound(ctx, h.settle, room, settle, "game.dawugui.settlement")
+	} else {
+		_ = bot.RunPending(ctx, room, h.settle)
+	}
+	return &pb.PlayCardsRsp{Meta: &pb.EventMeta{ActionSeq: uint32(room.ActionSeq)}}, nil
 }
 
 func parseUID(uid string) uint64 {
-	var v uint64
-	for i := 0; i < len(uid); i++ {
-		if uid[i] >= '0' && uid[i] <= '9' {
-			v = v*10 + uint64(uid[i]-'0')
-		}
-	}
+	v, _ := strconv.ParseUint(uid, 10, 64)
 	return v
 }

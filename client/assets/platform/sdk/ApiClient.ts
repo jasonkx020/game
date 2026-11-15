@@ -588,6 +588,7 @@ export class ApiClient {
     path: string,
     body?: unknown,
     baseUrl: string = this.cfg.apiBaseUrl,
+    opts: { skipAuthRetry?: boolean } = {},
   ): Promise<T> {
     const bodyStr = body !== undefined ? JSON.stringify(body) : ''
     const headers = await signRequest({
@@ -623,6 +624,26 @@ export class ApiClient {
       }
       if (!err.message) {
         err.message = `HTTP ${res.status}`
+      }
+
+      const isAuthFail = res.status === 401 || err.code === 1001 || err.code === 401
+      const canRefresh =
+        !opts.skipAuthRetry &&
+        isAuthFail &&
+        !path.includes('/auth/refresh') &&
+        !path.includes('/auth/logout') &&
+        !path.includes('/auth/sign-in') &&
+        !path.includes('/auth/login') &&
+        !!this.token &&
+        !!this.refresh
+
+      if (canRefresh) {
+        try {
+          await this.refreshTokens()
+          return this.request<T>(method, path, body, baseUrl, { skipAuthRetry: true })
+        } catch {
+          throw err
+        }
       }
       throw err
     }

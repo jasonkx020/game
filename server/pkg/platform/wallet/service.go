@@ -28,7 +28,7 @@ type RechargeOrder struct {
 	UserID    int64  `db:"user_id" json:"user_id"`
 	ProductID string `db:"product_id" json:"product_id"`
 	AmountCNY int    `db:"amount_cny" json:"amount_cny"`
-	Cards     int    `db:"cards" json:"cards"`
+	Cards     int64  `db:"cards" json:"cards"`
 	AuditSN   int64  `db:"audit_sn" json:"audit_sn"`
 	CreatedAt string `db:"created_at" json:"created_at"`
 }
@@ -167,6 +167,73 @@ func (s *Service) DeductRoomCard(ctx context.Context, userID int64, amount int64
 		return err
 	}
 	return tx.Commit()
+}
+
+// ApplyGameCoinDelta adjusts game coin within an existing transaction (may be negative).
+// Creates the wallet row if missing. balance is floored at 0 for deductions beyond balance
+// only when allowNegative is false; otherwise returns ErrInsufficientBalance.
+func (s *Service) ApplyGameCoinDeltaTx(ctx context.Context, tx *sqlx.Tx, userID int64, gameID string, delta int64, reason, refID string, auditSN uint64) (int64, error) {
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO wallet_game_coin (user_id, game_id, balance) VALUES ($1,$2,0)
+		 ON CONFLICT (user_id, game_id) DO NOTHING`, userID, gameID); err != nil {
+		return 0, err
+	}
+	var bal int64
+	if err := tx.GetContext(ctx, &bal,
+		`SELECT balance FROM wallet_game_coin WHERE user_id=$1 AND game_id=$2 FOR UPDATE`, userID, gameID); err != nil {
+		return 0, err
+	}
+	newBal := bal + delta
+	if newBal < 0 {
+		return 0, ErrInsufficientBalance
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE wallet_game_coin SET balance=$1, updated_at=now() WHERE user_id=$2 AND game_id=$3`,
+		newBal, userID, gameID); err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO wallet_ledger (user_id, wallet_type, game_id, delta, balance_after, reason, ref_id, audit_sn)
+		 VALUES ($1, 'game_coin', $2, $3, $4, $5, $6::uuid, $7)`,
+		userID, gameID, delta, newBal, reason, nullUUID(refID), auditSN); err != nil {
+		return 0, err
+	}
+	return newBal, nil
+}
+
+func (s *Service) CreditGameCoin(ctx context.Context, userID int64, gameID string, amount int64, reason, refID string, auditSN uint64) (int64, error) {
+	if amount < 0 {
+		return 0, errors.New("credit amount must be non-negative")
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	bal, err := s.ApplyGameCoinDeltaTx(ctx, tx, userID, gameID, amount, reason, refID, auditSN)
+	if err != nil {
+		return 0, err
+	}
+	return bal, tx.Commit()
+}
+
+func (s *Service) DeductGameCoin(ctx context.Context, userID int64, gameID string, amount int64, reason, refID string, auditSN uint64) error {
+	if amount < 0 {
+		return errors.New("deduct amount must be non-negative")
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if _, err := s.ApplyGameCoinDeltaTx(ctx, tx, userID, gameID, -amount, reason, refID, auditSN); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Service) BeginTx(ctx context.Context) (*sqlx.Tx, error) {
+	return s.db.BeginTxx(ctx, nil)
 }
 
 func nullUUID(s string) interface{} {

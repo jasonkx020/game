@@ -30,6 +30,7 @@ type RoomRuntime struct {
 	mu          sync.Mutex
 	RoomID      uuid.UUID
 	GameID      string
+	RoomMode    string // room_card | score_field
 	Seats       map[uint64]*Seat
 	EngineState engine.GameState
 	RoundID     uuid.UUID
@@ -48,16 +49,35 @@ func NewStore() *Store {
 	return &Store{rooms: make(map[uuid.UUID]*RoomRuntime)}
 }
 
+type CreateOpts struct {
+	GameID      string
+	MaxPlayers  int
+	BaseScore   int64
+	RoomMode    string
+}
+
 func (s *Store) GetOrCreate(roomID uuid.UUID, gameID string, maxPlayers int) *RoomRuntime {
+	return s.GetOrCreateWith(roomID, CreateOpts{GameID: gameID, MaxPlayers: maxPlayers, BaseScore: 1, RoomMode: "room_card"})
+}
+
+func (s *Store) GetOrCreateWith(roomID uuid.UUID, opts CreateOpts) *RoomRuntime {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r, ok := s.rooms[roomID]; ok {
 		return r
 	}
+	base := opts.BaseScore
+	if base <= 0 {
+		base = 1
+	}
+	mode := opts.RoomMode
+	if mode == "" {
+		mode = "room_card"
+	}
 	r := &RoomRuntime{
-		RoomID: roomID, GameID: gameID,
+		RoomID: roomID, GameID: opts.GameID, RoomMode: mode,
 		Seats:  make(map[uint64]*Seat),
-		Config: engine.GameConfig{GameID: gameID, Players: maxPlayers, BaseScore: 1},
+		Config: engine.GameConfig{GameID: opts.GameID, Players: opts.MaxPlayers, BaseScore: base},
 	}
 	s.rooms[roomID] = r
 	return r

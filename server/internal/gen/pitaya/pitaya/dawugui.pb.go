@@ -565,7 +565,7 @@ type PlayerScore struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        uint64                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Seat          uint32                 `protobuf:"varint,2,opt,name=seat,proto3" json:"seat,omitempty"`
-	RuleScore     int32                  `protobuf:"varint,3,opt,name=rule_score,json=ruleScore,proto3" json:"rule_score,omitempty"`
+	RuleScore     int64                  `protobuf:"varint,3,opt,name=rule_score,json=ruleScore,proto3" json:"rule_score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -614,7 +614,7 @@ func (x *PlayerScore) GetSeat() uint32 {
 	return 0
 }
 
-func (x *PlayerScore) GetRuleScore() int32 {
+func (x *PlayerScore) GetRuleScore() int64 {
 	if x != nil {
 		return x.RuleScore
 	}
@@ -832,7 +832,7 @@ const file_pitaya_dawugui_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\x04R\x06userId\x12\x12\n" +
 	"\x04seat\x18\x02 \x01(\rR\x04seat\x12\x1d\n" +
 	"\n" +
-	"rule_score\x18\x03 \x01(\x05R\truleScore\"V\n" +
+	"rule_score\x18\x03 \x01(\x03R\truleScore\"V\n" +
 	"\n" +
 	"PlayerCoin\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x04R\x06userId\x12\x14\n" +

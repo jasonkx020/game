@@ -69,7 +69,7 @@ type RoundEnd struct {
 type PlayerScore struct {
 	UserID    uint64
 	Seat      uint32
-	RuleScore int32
+	RuleScore int64
 	// Rank is 1-based placement; 0 means unused (simple games may ignore).
 	Rank int32
 	// TeamID groups teammates for team-based scoring; empty if unused.

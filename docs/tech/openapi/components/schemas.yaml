@@ -200,6 +200,7 @@ CreateRoomResponse:
       description: WebSocket 连接地址
     room_card_cost:
       type: integer
+      format: int64
       description: 扣除房卡数，记分场为 0
     audit_sn:
       type: integer
@@ -370,6 +371,7 @@ GameConfig:
       type: object
       additionalProperties:
         type: integer
+        format: int64
       description: '玩家人数 -> 房卡消耗，如 "4": 2'
     tiers:
       type: array
@@ -489,6 +491,7 @@ MatchSummary:
       properties:
         my_rule_score:
           type: integer
+          format: int64
           description: 当前用户本局规则积分
         my_coin_delta:
           type: integer
@@ -584,6 +587,7 @@ SettlementSummary:
             type: integer
           rule_score:
             type: integer
+            format: int64
 
 RoundReplayResponse:
   type: object

@@ -1,6 +1,6 @@
 import { Color, Graphics, Label, Layers, Node, UIOpacity, UITransform, Vec3 } from 'cc'
 
-/** 全局设计分辨率（竖屏） */
+/** 全局设计分辨率（竖屏棋牌基准；适配见 ScreenFit FIXED_HEIGHT） */
 export const UI_DESIGN_WIDTH = 720
 export const UI_DESIGN_HEIGHT = 1280
 

@@ -86,6 +86,13 @@ export interface SettlementEvent {
   rakeAmount: number;
   finalHands: EventFinalHand[];
   draw: boolean;
+  coinDelta: EventPlayerCoin[];
+}
+
+export interface EventPlayerCoin {
+  userId: number;
+  delta: number;
+  auditSn: number;
 }
 
 export interface EventPlayerScore {
@@ -1228,7 +1235,16 @@ export const RoundInvalidEvent: MessageFns<RoundInvalidEvent> = {
 };
 
 function createBaseSettlementEvent(): SettlementEvent {
-  return { isValid: false, winnerId: 0, scores: [], liability: undefined, rakeAmount: 0, finalHands: [], draw: false };
+  return {
+    isValid: false,
+    winnerId: 0,
+    scores: [],
+    liability: undefined,
+    rakeAmount: 0,
+    finalHands: [],
+    draw: false,
+    coinDelta: [],
+  };
 }
 
 export const SettlementEvent: MessageFns<SettlementEvent> = {
@@ -1253,6 +1269,9 @@ export const SettlementEvent: MessageFns<SettlementEvent> = {
     }
     if (message.draw !== false) {
       writer.uint32(56).bool(message.draw);
+    }
+    for (const v of message.coinDelta) {
+      EventPlayerCoin.encode(v!, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -1326,6 +1345,14 @@ export const SettlementEvent: MessageFns<SettlementEvent> = {
             message.draw = reader.bool();
             continue;
           }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.coinDelta.push(EventPlayerCoin.decode(reader, reader.uint32()));
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1365,6 +1392,11 @@ export const SettlementEvent: MessageFns<SettlementEvent> = {
         ? object.final_hands.map((e: any) => EventFinalHand.fromJSON(e))
         : [],
       draw: isSet(object.draw) ? globalThis.Boolean(object.draw) : false,
+      coinDelta: globalThis.Array.isArray(object?.coinDelta)
+        ? object.coinDelta.map((e: any) => EventPlayerCoin.fromJSON(e))
+        : globalThis.Array.isArray(object?.coin_delta)
+        ? object.coin_delta.map((e: any) => EventPlayerCoin.fromJSON(e))
+        : [],
     };
   },
 
@@ -1391,6 +1423,9 @@ export const SettlementEvent: MessageFns<SettlementEvent> = {
     if (message.draw !== false) {
       obj.draw = message.draw;
     }
+    if (message.coinDelta?.length) {
+      obj.coinDelta = message.coinDelta.map((e) => EventPlayerCoin.toJSON(e));
+    }
     return obj;
   },
 
@@ -1408,6 +1443,116 @@ export const SettlementEvent: MessageFns<SettlementEvent> = {
     message.rakeAmount = object.rakeAmount ?? 0;
     message.finalHands = object.finalHands?.map((e) => EventFinalHand.fromPartial(e)) || [];
     message.draw = object.draw ?? false;
+    message.coinDelta = object.coinDelta?.map((e) => EventPlayerCoin.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseEventPlayerCoin(): EventPlayerCoin {
+  return { userId: 0, delta: 0, auditSn: 0 };
+}
+
+export const EventPlayerCoin: MessageFns<EventPlayerCoin> = {
+  encode(message: EventPlayerCoin, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== 0) {
+      writer.uint32(8).uint64(message.userId);
+    }
+    if (message.delta !== 0) {
+      writer.uint32(16).int64(message.delta);
+    }
+    if (message.auditSn !== 0) {
+      writer.uint32(24).uint64(message.auditSn);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EventPlayerCoin {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEventPlayerCoin();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.userId = longToNumber(reader.uint64());
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.delta = longToNumber(reader.int64());
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.auditSn = longToNumber(reader.uint64());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): EventPlayerCoin {
+    return {
+      userId: isSet(object.userId)
+        ? globalThis.Number(object.userId)
+        : isSet(object.user_id)
+        ? globalThis.Number(object.user_id)
+        : 0,
+      delta: isSet(object.delta) ? globalThis.Number(object.delta) : 0,
+      auditSn: isSet(object.auditSn)
+        ? globalThis.Number(object.auditSn)
+        : isSet(object.audit_sn)
+        ? globalThis.Number(object.audit_sn)
+        : 0,
+    };
+  },
+
+  toJSON(message: EventPlayerCoin): unknown {
+    const obj: any = {};
+    if (message.userId !== 0) {
+      obj.userId = Math.round(message.userId);
+    }
+    if (message.delta !== 0) {
+      obj.delta = Math.round(message.delta);
+    }
+    if (message.auditSn !== 0) {
+      obj.auditSn = Math.round(message.auditSn);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EventPlayerCoin>, I>>(base?: I): EventPlayerCoin {
+    return EventPlayerCoin.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EventPlayerCoin>, I>>(object: I): EventPlayerCoin {
+    const message = createBaseEventPlayerCoin();
+    message.userId = object.userId ?? 0;
+    message.delta = object.delta ?? 0;
+    message.auditSn = object.auditSn ?? 0;
     return message;
   },
 };
@@ -1425,7 +1570,7 @@ export const EventPlayerScore: MessageFns<EventPlayerScore> = {
       writer.uint32(16).uint32(message.seat);
     }
     if (message.ruleScore !== 0) {
-      writer.uint32(24).int32(message.ruleScore);
+      writer.uint32(24).int64(message.ruleScore);
     }
     if (message.rank !== 0) {
       writer.uint32(32).int32(message.rank);
@@ -1470,7 +1615,7 @@ export const EventPlayerScore: MessageFns<EventPlayerScore> = {
               break;
             }
 
-            message.ruleScore = reader.int32();
+            message.ruleScore = longToNumber(reader.int64());
             continue;
           }
           case 4: {

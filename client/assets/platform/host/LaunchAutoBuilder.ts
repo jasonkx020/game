@@ -7,7 +7,6 @@ import {
   createUINode,
   ensureUILayer,
   paintRoundRect,
-  paintSkyBackground,
   place,
 } from '../lobby/LobbyUIKit'
 
@@ -47,10 +46,9 @@ export function buildLaunchUI(parent: Node, handlers: Handlers): LaunchBuiltUI {
   if (old) old.destroy()
 
   const root = createUINode('AutoLaunch')
+  // 内容按 720×1280 安全区居中；满屏背景由 UICanvasHost FullBleedBg 负责
   root.addComponent(UITransform).setContentSize(W, H)
   parent.addChild(root)
-
-  paintSkyBackground(root, W, H)
 
   // ===== 1. Header =====
   const header = createUINode('LoginHeader')

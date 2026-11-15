@@ -227,9 +227,9 @@ func (e *Engine) CalcSettlement(state engine.GameState, end engine.RoundEnd) (en
 	st := state.(*State)
 	scores := make([]engine.PlayerScore, len(st.Players))
 	for i, p := range st.Players {
-		score := int32(-1)
+		score := int64(-1)
 		if p.Seat == end.WinnerSeat {
-			score = int32(len(st.Players) - 1)
+			score = int64(len(st.Players) - 1)
 		}
 		scores[i] = engine.PlayerScore{UserID: p.UserID, Seat: p.Seat, RuleScore: score}
 	}

@@ -1117,7 +1117,7 @@ export const PlayerScore: MessageFns<PlayerScore> = {
       writer.uint32(16).uint32(message.seat);
     }
     if (message.ruleScore !== 0) {
-      writer.uint32(24).int32(message.ruleScore);
+      writer.uint32(24).int64(message.ruleScore);
     }
     return writer;
   },
@@ -1156,7 +1156,7 @@ export const PlayerScore: MessageFns<PlayerScore> = {
               break;
             }
 
-            message.ruleScore = reader.int32();
+            message.ruleScore = longToNumber(reader.int64());
             continue;
           }
         }

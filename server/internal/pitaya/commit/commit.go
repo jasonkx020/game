@@ -120,8 +120,12 @@ func EventToPush(room *runtime.RoomRuntime, ev engine.GameEvent, auditSN uint64)
 			for i, sc := range s.Scores {
 				scores[i] = &pb.PlayerScore{UserId: sc.UserId, Seat: sc.Seat, RuleScore: sc.RuleScore}
 			}
+			coins := make([]*pb.PlayerCoin, len(s.CoinDelta))
+			for i, c := range s.CoinDelta {
+				coins[i] = &pb.PlayerCoin{UserId: c.UserId, Delta: c.Delta, AuditSn: c.AuditSn}
+			}
 			return &pb.SettlementPush{Header: header, RoundId: room.RoundID.String(), IsValid: s.IsValid,
-				WinnerId: s.WinnerId, Scores: scores}, nil
+				WinnerId: s.WinnerId, Scores: scores, CoinDelta: coins, RakeAmount: s.RakeAmount}, nil
 		}
 	case "onRoomState":
 		if rs := ge.GetRoomState(); rs != nil {
@@ -129,7 +133,8 @@ func EventToPush(room *runtime.RoomRuntime, ev engine.GameEvent, auditSN uint64)
 			for i, p := range rs.Players {
 				players[i] = &pb.PlayerSeat{UserId: p.UserId, Seat: p.Seat, Nickname: p.Nickname, Ready: p.Ready, Online: p.Online}
 			}
-			return &pb.RoomStatePush{Header: header, Phase: rs.Phase, RoomMode: rs.RoomMode, Players: players, RoundNo: rs.RoundNo}, nil
+			return &pb.RoomStatePush{Header: header, Phase: rs.Phase, RoomMode: rs.RoomMode, Players: players,
+				RoundNo: rs.RoundNo, BaseScore: rs.BaseScore}, nil
 		}
 	}
 	return &pb.ErrorPush{Header: header, Code: 500, Message: "unknown event mapping"}, nil

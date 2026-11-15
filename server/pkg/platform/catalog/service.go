@@ -22,13 +22,23 @@ type GameSummary struct {
 	SortOrder  int    `db:"sort_order" json:"sort_order,omitempty"`
 }
 
+type ScoreTier struct {
+	TierID    string `json:"tier_id"`
+	Name      string `json:"name"`
+	BaseScore int64  `json:"base_score"`
+	MinCoin   int64  `json:"min_coin"`
+}
+
 type GameConfig struct {
 	GameID       string                 `json:"game_id"`
 	RoomCardCost map[string]int64       `json:"room_card_cost"`
 	RegisterGift map[string]int64       `json:"register_gift"`
 	CoinName     string                 `json:"coin_name"`
+	Tiers        []ScoreTier            `json:"tiers,omitempty"`
 	Raw          map[string]interface{} `json:"-"`
 }
+
+var ErrTierNotFound = errors.New("tier not found")
 
 type Service struct {
 	db *sqlx.DB
@@ -71,6 +81,24 @@ func (s *Service) RoomCardCost(ctx context.Context, gameID string, playerCount i
 		return cost, nil
 	}
 	return defaultRoomCardCost(playerCount), nil
+}
+
+// GetTier returns a score-field tier by id for the given game.
+func (s *Service) GetTier(ctx context.Context, gameID, tierID string) (*ScoreTier, error) {
+	if tierID == "" {
+		return nil, ErrTierNotFound
+	}
+	cfg, err := s.GetGameConfig(ctx, gameID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range cfg.Tiers {
+		if cfg.Tiers[i].TierID == tierID {
+			t := cfg.Tiers[i]
+			return &t, nil
+		}
+	}
+	return nil, ErrTierNotFound
 }
 
 func defaultRoomCardCost(playerCount int) int64 {

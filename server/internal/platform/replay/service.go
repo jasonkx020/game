@@ -17,7 +17,7 @@ type MatchSummary struct {
 	Status          string     `json:"status"`
 	StartedAt       time.Time  `json:"started_at"`
 	EndedAt         *time.Time `json:"ended_at,omitempty"`
-	MyRuleScore     int        `json:"my_rule_score"`
+	MyRuleScore     int64      `json:"my_rule_score"`
 	MyCoinDelta     int64      `json:"my_coin_delta"`
 	IsWinner        bool       `json:"is_winner"`
 	ReplayAvailable bool       `json:"replay_available"`

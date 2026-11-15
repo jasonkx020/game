@@ -9,7 +9,6 @@ import {
   createUINode,
   ensureUILayer,
   paintRoundRect,
-  paintSkyBackground,
   place,
 } from './LobbyUIKit'
 
@@ -59,9 +58,9 @@ export function buildLobbyUI(parent: Node, handlers: Handlers): LobbyBuiltUI {
   if (old) old.destroy()
 
   const root = createUINode('AutoLobby')
+  // 内容按 720×1280 安全区；满屏背景由 Canvas FullBleedBg 负责
   root.addComponent(UITransform).setContentSize(W, H)
   parent.addChild(root)
-  paintSkyBackground(root, W, H)
 
   // ===== 顶栏 status-bar =====
   const statusBar = createUINode('StatusBar')

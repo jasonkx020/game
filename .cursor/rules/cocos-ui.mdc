@@ -1,0 +1,65 @@
+---
+description: Cocos 棋牌客户端 UI 设计与 AI 生成约束（720×1280、FIXED_HEIGHT、省图）
+globs: client/**/*.{ts,tsx,scene,prefab,json}
+alwaysApply: false
+---
+
+# Cocos 棋牌 UI 约束（AI 生成必遵）
+
+面向竖屏棋牌：省大图、覆盖市面分辨率。生成或修改 `client/` 下 UI（场景、Prefab、`platform/lobby|host`、游戏 Bundle UI）时遵守本文。
+
+## 1. 设计分辨率
+
+| 项 | 值 |
+| :--- | :--- |
+| 设计宽×高 | **720 × 1280**（竖屏） |
+| 常量 | `UI_DESIGN_WIDTH` / `UI_DESIGN_HEIGHT`（`LobbyUIKit.ts`） |
+| 适配策略 | **FIXED_HEIGHT**（只适配高度；`fitHeight=true`，`fitWidth=false`） |
+| 满屏 | 高度铺满、无上下黑边；宽屏左右延伸；背景用可视尺寸（`getVisibleFrameSize` / `FullBleedBg`） |
+| 禁止 | `EXACT_FIT` 拉伸变形；`SHOW_ALL`（双 fit）导致大黑边当默认方案 |
+
+- 所有布局、坐标、字号、切图尺寸均按 **720 宽逻辑像素** 计算。
+- Canvas 四边 Widget：`left/right/top/bottom = 0`，`alignFlags` 含左右上下；`alignCanvasWithScreen = true`。
+- 运行时用 `applyScreenFit()`（`ScreenFit.ts`），勿另起一套分辨率策略。
+- 对外复制给图像/布局 LLM 的完整提示词见 [`docs/tech/cocos-ui-llm-prompt.md`](../../docs/tech/cocos-ui-llm-prompt.md)。
+
+## 2. 安全区与可扩展宽
+
+FIXED_HEIGHT 下，更宽屏左右会多出可视宽度；更窄屏可能裁左右。
+
+- **主内容安全宽**：居中 **720**；关键按钮、牌面、输入框、弹窗必须落在此宽度内。
+- **上下安全边距**：顶 ≥ 48、底 ≥ 48（避开刘海/Home 条）；全屏背景可顶到底，可点控件勿贴死物理边。
+- **可延伸装饰**：仅背景、桌布、氛围光允许画到 720 以外；勿把必读文案放到两侧裁切区。
+- 弹窗/面板最大宽约 **640～680**，水平居中。
+
+## 3. 省图与资源
+
+- **禁止**按 1080×1920 出整屏大图当默认资源。
+- 位图基准：**1x = 设计像素**（相对 720 宽）；高分屏优先引擎缩放，必要时再补 **2x**（边长 ×2），勿默认三套。
+- 优先：九宫格/平铺小图、纯色+`Graphics`、主题色块；大图仅用于必要氛围且单边尽量 ≤ 1024（特殊全屏图需说明理由）。
+- 牌面、图标用图集/碎图，避免整桌一张超大 PNG。
+- 不要为「更清晰」盲目提高设计稿分辨率。
+
+## 4. 布局与组件
+
+- UI 必须挂在 **Canvas / UI_2D** 下（`ensureUILayer` / `createUINode`）；勿把可点 UI 放在 DEFAULT 层。
+- 代码搭 UI：复用 `LobbyUIKit`、`LobbyTheme`、现有 AutoBuilder；**颜色用主题常量，禁止另起一套紫色/深色默认皮肤**（除非改主题文件并全局统一）。
+- 单屏结构保持简单：一屏一主任务；大厅/登录参考现有分区，勿堆仪表盘式多卡片墙。
+- 列表/货架可滚动；首屏勿塞满次要入口。
+- 字号参考（720 逻辑像素）：标题 24～28、正文 14～16、辅助 12～14；过小勿低于 12。
+
+## 5. 生成物检查清单
+
+AI 提交前自检：
+
+- [ ] 坐标与 `contentSize` 均相对 720×1280
+- [ ] 关键控件在 720 安全宽内，上下有安全边距
+- [ ] 未使用 EXACT_FIT / 双 fit 作为新默认
+- [ ] 未新增不必要的整屏高分辨率大图
+- [ ] Canvas Widget 四边为 0；节点在 UI_2D
+- [ ] 颜色与间距对齐 `LobbyTheme` / 现有大厅风格（改风格须显式说明）
+
+## 6. 文案与产品
+
+- 界面文案默认简体中文。
+- 房卡场 / 记分场用词与产品文档一致；货币展示区分房卡与游戏币（如龟币），勿混称「金币」指代房卡。

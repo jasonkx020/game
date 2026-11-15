@@ -5,6 +5,7 @@ import { buildLobbyUI } from '../../platform/lobby/LobbyAutoBuilder'
 import { ProfilePanel } from '../../platform/lobby/ProfilePanel'
 import { GameHost } from '../../platform/host/GameHost'
 import { LobbyTheme } from '../../platform/lobby/LobbyUIKit'
+import { applyScreenFit } from '../../platform/lobby/ScreenFit'
 import { resolveOrCreateUICanvas } from '../../platform/lobby/UICanvasHost'
 import { SessionStore } from '../SessionStore'
 import type { LobbyGameItem } from '../../platform/sdk/ApiClient'
@@ -73,6 +74,7 @@ export class LobbyScene extends Component {
   private matchTitleLabel: Label | null = null
 
   onLoad(): void {
+    applyScreenFit()
     if (this.autoBuildUI) {
       this.mountAutoUI()
     }
