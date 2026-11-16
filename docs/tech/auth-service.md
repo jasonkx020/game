@@ -93,5 +93,7 @@ Refresh 只存 SHA-256 hash（明文 32 字节随机）；`token_hash` 唯一约
 
 ```bash
 cp auth-service/.env.example auth-service/.env
-make run-auth
+make run-auth   # 会先跑 auth 迁移再启动 :8081
 ```
+
+库初始化、与游戏库的迁移分离：[database.md](database.md)。

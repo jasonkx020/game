@@ -1,6 +1,9 @@
 # env / secrets
 .env
 server/.env
+auth-service/.env
+scripts/postgres.local.env
+deploy/postgresql/postgres.env
 
 # Go
 bin/

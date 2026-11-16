@@ -22,8 +22,12 @@
 ## Windows 快速启动
 
 ```powershell
-# 1. 环境变量（放在 server/）
+# 1. 环境变量（放在 server/；生产/外置 PG 可改用 init-db 生成账号）
 Copy-Item server\.env.example server\.env
+Copy-Item auth-service\.env.example auth-service\.env
+# 可选首次建库（外置/本机 PG；Compose 默认同名库可跳过）：
+# cd deploy\postgresql; .\init-db.bat       # 或 .\scripts\dev.ps1 init-db
+# 说明见 deploy/postgresql/README.md 与 docs/tech/database.md
 
 # 2. 基础设施
 .\scripts\dev.ps1 up
@@ -69,14 +73,19 @@ make run-game          # 终端 3 — Pitaya :3250
 
 ### 数据库迁移
 
+详细说明（Auth / 游戏两套迁移、是否拆库、首次建库脚本）：[docs/tech/database.md](docs/tech/database.md)。
+
 | 命令 | Windows | Linux/macOS |
 |------|---------|-------------|
-| 查看状态 | `.\scripts\dev.ps1 migrate-status` | `make migrate-status` |
-| 升级到最新 | `.\scripts\dev.ps1 migrate` | `make migrate` |
+| 首次建用户/库/密码 | `deploy\postgresql\init-db.bat` / `.\scripts\dev.ps1 init-db` | `deploy/postgresql/init-db.sh` / `make init-db` |
+| 查看状态（游戏库） | `.\scripts\dev.ps1 migrate-status` | `make migrate-status` |
+| 升级到最新（游戏库） | `.\scripts\dev.ps1 migrate` / `seed-dev` | `make migrate` / `seed-dev` |
 | 回滚 1 步 | `.\scripts\dev.ps1 migrate-down` | `make migrate-down` |
 | 回滚 N 步 | `.\scripts\dev.ps1 migrate-down -Steps 2` | `make migrate-down STEPS=2` |
+| Auth 迁移 | `cd auth-service; go run ./cmd/migrate -path migrations`（或随 `run-auth`） | 同左 |
 
-或直接：`cd server && go run ./cmd/migrate status|up|down [N]`
+游戏：`cd server && go run ./cmd/migrate status|up|down [N]`（`schema_migrations`）。  
+Auth：独立版本表 `auth_schema_migrations`；`seed-dev` **不含** Auth 迁移。
 
 ## 生产构建（Linux）
 

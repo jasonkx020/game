@@ -1,4 +1,4 @@
-.PHONY: up down migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto tidy test lint run-game-api run-auth run-game run-admin-api run-admin run-admin-web build-linux docker-build docker-up-prod
+.PHONY: up down init-db migrate migrate-status migrate-down migrate-docker seed-dev gen-proto gen-client-proto tidy test lint run-game-api run-auth run-game run-admin-api run-admin run-admin-web build-linux docker-build docker-up-prod
 
 GOOS_LINUX ?= linux
 GOARCH ?= amd64
@@ -16,6 +16,10 @@ up:
 
 down:
 	$(COMPOSE) down
+
+# Prefer repo-root: make init-db / .\scripts\dev.ps1 init-db
+init-db:
+	bash ../deploy/postgresql/db-init.sh --write-env $(INIT_DB_ARGS)
 
 migrate:
 	go run ./cmd/migrate up

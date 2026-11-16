@@ -12,12 +12,16 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet(
-        'help', 'up', 'down', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
+        'help', 'up', 'down', 'init-db', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
         'run-game-api', 'run-auth', 'run-game', 'run-admin-api', 'run-admin', 'run-admin-web', 'test', 'lint', 'tidy',
         'gen-proto', 'gen-client-proto', 'gen-jwt-keys', 'build-linux', 'docker-build', 'serve-bundles'
     )]
     [string]$Command = 'help',
-    [int]$Steps = 1
+    [int]$Steps = 1,
+    [string]$AdminPassword = '',
+    [string]$AppPassword = '',
+    [switch]$SplitAuth,
+    [switch]$Docker
 )
 
 # Console UTF-8 so Chinese help renders under Windows PowerShell 5.1
@@ -133,6 +137,7 @@ Windows 开发命令（在仓库根目录执行）:
 
   .\scripts\dev.ps1 up              启动 Postgres + Redis (Docker)
   .\scripts\dev.ps1 down            停止基础设施
+  .\scripts\dev.ps1 init-db         首次建库（转发 deploy/postgresql；-SplitAuth / -AdminPassword）
   .\scripts\dev.ps1 migrate-status   查看迁移状态（当前/最新/待执行）
   .\scripts\dev.ps1 migrate         升级到最新版本
   .\scripts\dev.ps1 migrate-down    回滚一步（-Steps 2 回滚两步）
@@ -170,6 +175,17 @@ switch ($Command) {
     }
     'down' {
         docker compose -f (Join-Path $Server 'deploy/docker-compose.yml') down
+    }
+    'init-db' {
+        $init = Join-Path $Root 'deploy\postgresql\db-init.ps1'
+        $args = @('-WriteEnv')
+        if ($SplitAuth) { $args += '-SplitAuth' }
+        if ($AppPassword) { $args += @('-AppPassword', $AppPassword) }
+        if ($AdminPassword) { $env:PGPASSWORD = $AdminPassword }
+        if ($Docker) {
+            Write-Host 'Note: -Docker ignored; compose already has game:game. For host PG use init-db without -Docker.'
+        }
+        & $init @args
     }
     'migrate' { Invoke-Migrate 'up' }
     'migrate-status' { Invoke-Migrate 'status' }

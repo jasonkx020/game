@@ -1,0 +1,29 @@
+; ==================== GameS PostgreSQL Ubuntu launcher ====================
+; Copy to config.ini or merge. Superuser password empty = peer/trust.
+
+[PostgreSQL]
+; "." = auto-detect /usr/lib/postgresql/<version> or PATH
+install_path = .
+data_path = ./data
+port = 5432
+listen_bind = 127.0.0.1
+version = 16
+; systemd = apt PostgreSQL service; pg_ctl = local cluster
+run_mode = systemd
+systemd_service_name =
+add_firewall_rules = false
+log_dir = log
+
+[Superuser]
+user = postgres
+password =
+
+[Application]
+user = game
+password =
+db = game
+db_auth =
+
+[Init]
+default_scope = game
+write_env = true
