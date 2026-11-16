@@ -86,8 +86,7 @@ func Signature(cfg SignatureConfig, rdb *goredis.Client) gin.HandlerFunc {
 	}
 }
 
-func JWT(secret string) gin.HandlerFunc {
-	sec := []byte(secret)
+func JWT() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if !strings.HasPrefix(auth, "Bearer ") {
@@ -96,7 +95,6 @@ func JWT(secret string) gin.HandlerFunc {
 		}
 		token := strings.TrimPrefix(auth, "Bearer ")
 		c.Set("access_token", token)
-		_ = sec
 		c.Next()
 	}
 }

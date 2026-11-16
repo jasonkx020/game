@@ -1,6 +1,6 @@
 # auth-service
 
-独立登录与 Token 服务。客户端直连本进程完成 sign-in / 微信 / 实名 / refresh；GameS 等业务服仅用共享 `JWT_SECRET` 校验未过期的 access JWT。
+独立登录与 Token 服务。客户端直连本进程完成 sign-in / 微信 / 实名 / refresh；GameS 等业务服用 **ES256 公钥**校验未过期的 access JWT（Auth 持私钥；见 `keys/` 与 `/.well-known/jwks.json`）。
 
 ## 端口与接口
 

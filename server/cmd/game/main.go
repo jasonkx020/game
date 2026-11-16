@@ -56,7 +56,7 @@ func main() {
 
 	gen := audit.NewGenerator(cfg.SnowflakeWorkerID)
 	logRepo := actionlog.NewRepo(sqlDB)
-	players := player.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
+	players := player.NewService(sqlDB)
 	wallets := wallet.NewService(sqlDB)
 	settler := settlement.New(wallets)
 	store := runtime.NewStore()

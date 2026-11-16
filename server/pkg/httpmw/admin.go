@@ -1,6 +1,7 @@
 package httpmw
 
 import (
+	"crypto/ecdsa"
 	"net/http"
 	"strings"
 
@@ -41,14 +42,14 @@ func CORS(origins []string) gin.HandlerFunc {
 	}
 }
 
-func RequirePrincipalType(jwtSecret, want string) gin.HandlerFunc {
+func RequirePrincipalType(pub *ecdsa.PublicKey, want string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := bearerToken(c)
 		if token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "token required", "request_id": c.GetString("request_id")})
 			return
 		}
-		typ, err := user.ParsePrincipalType(token, []byte(jwtSecret))
+		typ, err := user.ParsePrincipalType(token, pub)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
 			return
@@ -62,7 +63,7 @@ func RequirePrincipalType(jwtSecret, want string) gin.HandlerFunc {
 	}
 }
 
-func RequireRole(jwtSecret string, roles ...string) gin.HandlerFunc {
+func RequireRole(pub *ecdsa.PublicKey, roles ...string) gin.HandlerFunc {
 	roleSet := make(map[string]struct{}, len(roles))
 	for _, r := range roles {
 		roleSet[r] = struct{}{}
@@ -73,7 +74,7 @@ func RequireRole(jwtSecret string, roles ...string) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "token required", "request_id": c.GetString("request_id")})
 			return
 		}
-		role, err := user.ParseRole(token, []byte(jwtSecret))
+		role, err := user.ParseRole(token, pub)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
 			return

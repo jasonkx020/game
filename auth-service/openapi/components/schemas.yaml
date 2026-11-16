@@ -147,7 +147,7 @@ TokenPair:
   properties:
     access_token:
       type: string
-      description: JWT access；业务服用共享 JWT_SECRET 校验未过期 token
+      description: JWT access（alg=ES256）；业务服用 Auth 公钥校验未过期 token
     refresh_token:
       type: string
       description: opaque refresh；仅 auth-service 可轮换

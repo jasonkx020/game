@@ -28,7 +28,7 @@ func (h *Handler) Entry(ctx context.Context, req *pb.EntryReq) (*pb.EntryRsp, er
 }
 
 func (h *Handler) Bind(ctx context.Context, req *pb.BindReq) (*pb.BindRsp, error) {
-	claims, err := user.ParseAccessClaims(req.AccessToken, []byte(h.cfg.JWTSecret))
+	claims, err := user.ParseAccessClaims(req.AccessToken, h.cfg.JWTPublicKey)
 	if err != nil || claims.PrincipalType != user.PrincipalTypePlayer {
 		return nil, pitaya.Error(err, "AUTH")
 	}

@@ -8,7 +8,7 @@
 | `game-api` / Pitaya | 仅校验**未过期** access JWT；懒链接本地 `players` / `admin_users`；`status!=active` 拒绝 Bind |
 | `admin-api` (`:8082`) | 编排封禁/踢线（调 Auth + Redis `ops:player_kick`）；停服不影响游戏 |
 
-共享 `JWT_SECRET`、`HMAC_SECRET`、`APP_ID`。
+共享 `HMAC_SECRET`、`APP_ID`。Access JWT 为 **ES256**：Auth 持私钥签发，业务服只持公钥验签（`JWT_PUBLIC_KEY_FILE` / JWKS）。
 
 ## Phone / Nickname 归属
 

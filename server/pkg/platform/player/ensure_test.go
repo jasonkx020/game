@@ -16,7 +16,7 @@ func newMockService(t *testing.T) (*Service, sqlmock.Sqlmock) {
 		t.Fatalf("sqlmock: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewService(sqlx.NewDb(db, "sqlmock"), "secret", "123456"), mock
+	return NewService(sqlx.NewDb(db, "sqlmock")), mock
 }
 
 func TestSeedPlayerNickname(t *testing.T) {

@@ -1,6 +1,9 @@
 package authsvc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -8,8 +11,17 @@ import (
 	"github.com/example/auth-service/internal/token"
 )
 
+func testTokenManager(t *testing.T, ttl time.Duration) *token.Manager {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return token.NewManager(key, "test", ttl)
+}
+
 func TestParseAllowExpiredAndSubjectBind(t *testing.T) {
-	mgr := token.NewManager("test-secret-at-least-32-bytes!!", 1*time.Second)
+	mgr := testTokenManager(t, 1*time.Second)
 	access, _, err := mgr.IssueAccess(42, token.RolePlayer, token.PrincipalPlayer, "13900000042", "测试")
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/ecdsa"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"strings"
@@ -18,12 +20,13 @@ import (
 type Server struct {
 	cfg    *config.Config
 	auth   *authsvc.Service
+	tokens *token.Manager
 	rdb    *goredis.Client
 	engine *gin.Engine
 }
 
-func New(cfg *config.Config, auth *authsvc.Service, rdb *goredis.Client) *Server {
-	s := &Server{cfg: cfg, auth: auth, rdb: rdb}
+func New(cfg *config.Config, auth *authsvc.Service, tokens *token.Manager, rdb *goredis.Client) *Server {
+	s := &Server{cfg: cfg, auth: auth, tokens: tokens, rdb: rdb}
 	s.engine = s.build()
 	return s
 }
@@ -37,6 +40,7 @@ func (s *Server) build() *gin.Engine {
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	r.GET("/.well-known/jwks.json", s.jwks)
 
 	v1 := r.Group("/v1")
 	v1.Use(httpmw.Signature(httpmw.SignatureConfig{
@@ -351,6 +355,37 @@ func writeProfile(c *gin.Context, p *authsvc.Profile) {
 		"is_minor":          p.IsMinor,
 		"request_id":        c.GetString("request_id"),
 	})
+}
+
+func (s *Server) jwks(c *gin.Context) {
+	if s.tokens == nil || s.tokens.PublicKey() == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "jwks unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"keys": []gin.H{ecdsaPublicJWK(s.tokens.PublicKey(), s.tokens.KeyID())},
+	})
+}
+
+func ecdsaPublicJWK(pub *ecdsa.PublicKey, kid string) gin.H {
+	return gin.H{
+		"kty": "EC",
+		"crv": "P-256",
+		"alg": "ES256",
+		"use": "sig",
+		"kid": kid,
+		"x":   base64.RawURLEncoding.EncodeToString(padCoord(pub.X.Bytes(), 32)),
+		"y":   base64.RawURLEncoding.EncodeToString(padCoord(pub.Y.Bytes(), 32)),
+	}
+}
+
+func padCoord(b []byte, size int) []byte {
+	if len(b) >= size {
+		return b[len(b)-size:]
+	}
+	out := make([]byte, size)
+	copy(out[size-len(b):], b)
+	return out
 }
 
 func writeAuthErr(c *gin.Context, err error) {

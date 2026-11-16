@@ -22,13 +22,11 @@ type Player struct {
 }
 
 type Service struct {
-	db        *sqlx.DB
-	jwtSecret []byte
-	devCode   string
+	db *sqlx.DB
 }
 
-func NewService(db *sqlx.DB, jwtSecret, devCode string) *Service {
-	return &Service{db: db, jwtSecret: []byte(jwtSecret), devCode: devCode}
+func NewService(db *sqlx.DB) *Service {
+	return &Service{db: db}
 }
 
 // EnsureFromAuth links or creates a local player for an auth-service account.

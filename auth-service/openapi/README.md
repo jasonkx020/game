@@ -15,7 +15,7 @@
 2. 所有 `/v1/*` 请求按 [http-signature.md](./http-signature.md) 签名（共享 `APP_ID` / `HMAC_SECRET`）。
 3. 登录成功后保存 `access_token` + `refresh_token`；关注 `is_new_user`；业务请求只带未过期 access。
 4. Refresh 时 **同时**上传 access（可过期）与 refresh。
-5. 业务服用共享 `JWT_SECRET` 验 HS256 JWT；`sub` = `account_id`。
+5. 业务服用 Auth **ES256 公钥**验 JWT（`JWT_PUBLIC_KEY_FILE` 或 JWKS）；`sub` = `account_id`。
 6. Admin 用 `/v1/admin/auth/login`（账号须已存在，不自动建号）。
 
 ## 推荐调用顺序

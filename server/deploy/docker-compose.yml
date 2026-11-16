@@ -34,7 +34,7 @@ services:
   #   environment:
   #     DATABASE_URL: postgres://game:game@postgres:5432/game?sslmode=disable
   #     REDIS_URL: redis://redis:6379/0
-  #     JWT_SECRET: dev-jwt-secret-change-me
+  #     JWT_PUBLIC_KEY_FILE: /keys/jwt-es256-dev.pub.pem
   #     HMAC_SECRET: dev-hmac-secret-change-me
   #     AUTH_HTTP_PORT: "8081"
   #   depends_on:

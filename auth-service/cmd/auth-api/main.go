@@ -18,7 +18,6 @@ import (
 	"github.com/example/auth-service/internal/oauth/wechat"
 	"github.com/example/auth-service/internal/otp"
 	"github.com/example/auth-service/internal/store"
-	"github.com/example/auth-service/internal/token"
 )
 
 func main() {
@@ -51,7 +50,10 @@ func main() {
 		}
 	}
 
-	tokens := token.NewManager(cfg.JWTSecret, cfg.AccessTokenExpire)
+	tokens, err := cfg.LoadTokenManager()
+	if err != nil {
+		log.Fatalf("jwt keys: %v", err)
+	}
 	otpStore := otp.New(rdb, cfg.DevSMSCode, cfg.DevEmailCode)
 	wx := wechat.NewResolver(wechat.Config{
 		Mode:      cfg.WeChatMode,
@@ -62,7 +64,7 @@ func main() {
 	})
 	verifier := kyc.NewVerifier(cfg.KYCMode, cfg.AliyunAccessKeyID, cfg.AliyunAccessKeySecret, cfg.AliyunCloudauthEndpoint)
 	svc := authsvc.New(st, tokens, otpStore, wx, verifier, cfg.RefreshTokenExpire, cfg.RefreshGrace, "")
-	srv := api.New(cfg, svc, rdb)
+	srv := api.New(cfg, svc, tokens, rdb)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.AuthHTTPPort,

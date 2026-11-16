@@ -47,7 +47,7 @@ func main() {
 	defer rdb.Close()
 
 	gen := audit.NewGenerator(cfg.SnowflakeWorkerID)
-	players := player.NewService(sqlDB, cfg.JWTSecret, cfg.DevSMSCode)
+	players := player.NewService(sqlDB)
 	wallets := wallet.NewService(sqlDB)
 	rooms := room.NewService(sqlDB)
 	clubs := club.NewService(sqlDB)

@@ -58,13 +58,17 @@ services:
     environment:
       DATABASE_URL: postgres://game:${POSTGRES_PASSWORD:-game}@postgres:5432/game?sslmode=disable
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET}
       HMAC_SECRET: ${HMAC_SECRET}
       APP_ID: ${APP_ID:-cocos-dev}
       AUTH_HTTP_PORT: "8081"
       ADMIN_DEV_PHONE: ${ADMIN_DEV_PHONE:-13800000000}
+      JWT_KEY_ID: ${JWT_KEY_ID:-es256-1}
+      JWT_PRIVATE_KEY_FILE: /keys/jwt-es256-dev.pem
+      JWT_PUBLIC_KEY_FILE: /keys/jwt-es256-dev.pub.pem
       GIN_MODE: release
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+    volumes:
+      - ${JWT_KEYS_DIR:-../../auth-service/keys}:/keys:ro
     ports:
       - "${AUTH_HTTP_PORT:-8081}:8081"
     depends_on:
@@ -83,13 +87,15 @@ services:
     environment:
       DATABASE_URL: postgres://game:${POSTGRES_PASSWORD:-game}@postgres:5432/game?sslmode=disable
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET}
       HMAC_SECRET: ${HMAC_SECRET}
       APP_ID: ${APP_ID:-cocos-dev}
       GAME_API_HTTP_PORT: "8080"
       PITAYA_WS_URL: ${PITAYA_WS_URL:-ws://localhost:3250}
+      JWT_PUBLIC_KEY_FILE: /keys/jwt-es256-dev.pub.pem
       GIN_MODE: release
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+    volumes:
+      - ${JWT_KEYS_DIR:-../../auth-service/keys}:/keys:ro
     ports:
       - "${GAME_API_HTTP_PORT:-8080}:8080"
     depends_on:
@@ -110,10 +116,12 @@ services:
     environment:
       DATABASE_URL: postgres://game:${POSTGRES_PASSWORD:-game}@postgres:5432/game?sslmode=disable
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET}
       HMAC_SECRET: ${HMAC_SECRET}
       PITAYA_WS_PORT: "3250"
+      JWT_PUBLIC_KEY_FILE: /keys/jwt-es256-dev.pub.pem
       GIN_MODE: release
+    volumes:
+      - ${JWT_KEYS_DIR:-../../auth-service/keys}:/keys:ro
     ports:
       - "${PITAYA_WS_PORT:-3250}:3250"
     depends_on:

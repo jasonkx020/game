@@ -89,7 +89,7 @@ make docker-build      # game-api:latest, game-server:latest
 make docker-up-prod    # 参考 server/deploy/docker-compose.prod.yml
 ```
 
-生产环境请修改 `server/.env` 中的 `JWT_SECRET`、`HMAC_SECRET`、`POSTGRES_PASSWORD`，勿使用 dev 默认值。
+生产环境请修改 `HMAC_SECRET`、`POSTGRES_PASSWORD`，并替换 Auth ES256 密钥对（勿使用仓库内 dev PEM），业务服只配置公钥。
 
 ## 游戏客户端
 

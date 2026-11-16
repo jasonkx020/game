@@ -14,7 +14,7 @@ param(
     [ValidateSet(
         'help', 'up', 'down', 'migrate', 'migrate-status', 'migrate-down', 'migrate-docker', 'seed-dev',
         'run-game-api', 'run-auth', 'run-game', 'run-admin-api', 'run-admin', 'run-admin-web', 'test', 'lint', 'tidy',
-        'gen-proto', 'gen-client-proto', 'build-linux', 'docker-build', 'serve-bundles'
+        'gen-proto', 'gen-client-proto', 'gen-jwt-keys', 'build-linux', 'docker-build', 'serve-bundles'
     )]
     [string]$Command = 'help',
     [int]$Steps = 1
@@ -148,6 +148,7 @@ Windows 开发命令（在仓库根目录执行）:
   .\scripts\dev.ps1 lint            游戏模块 import 边界检查（server/）
   .\scripts\dev.ps1 gen-proto       生成 Go proto（自动查找 buf.exe）
   .\scripts\dev.ps1 gen-client-proto  生成客户端 TS proto
+  .\scripts\dev.ps1 gen-jwt-keys    生成 ES256 开发密钥（auth-service/keys + server/keys 公钥）
   .\scripts\dev.ps1 build-linux     交叉编译 Linux amd64 二进制到 server/bin/
   .\scripts\dev.ps1 docker-build    构建 Linux 生产镜像
   .\scripts\dev.ps1 serve-bundles   本地托管游戏 Bundle (:8787)
@@ -237,6 +238,14 @@ switch ($Command) {
         Invoke-BufGenerate -Template 'buf.gen.client.yaml'
         Push-Location $Client
         try { node scripts/patch-proto-long.mjs } finally { Pop-Location }
+    }
+    'gen-jwt-keys' {
+        Push-Location $Auth
+        try { go run ./keys/gen_jwt_keys.go } finally { Pop-Location }
+        $serverKeys = Join-Path $Server 'keys'
+        New-Item -ItemType Directory -Force -Path $serverKeys | Out-Null
+        Copy-Item -Force (Join-Path $Auth 'keys/jwt-es256-dev.pub.pem') (Join-Path $serverKeys 'jwt-es256-dev.pub.pem')
+        Write-Host "ES256 keys: auth-service/keys/ (private+pub), server/keys/ (pub only)"
     }
     'build-linux' {
         Push-Location $Server

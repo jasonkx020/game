@@ -4,7 +4,7 @@ info:
   description: |
     独立登录与身份服务（auth-api）。其他业务项目只需：
     1. 直连本服务完成 sign-in / 微信 / 刷新 / 实名；
-    2. 用共享 `JWT_SECRET` 校验业务请求中的未过期 access JWT（`sub`=account_id）。
+    2. 用 Auth 公钥（ES256）校验业务请求中的未过期 access JWT（`sub`=account_id）；公钥见 `/.well-known/jwks.json`。
 
     **签名**：所有 `/v1/*` 须 HMAC，见 [http-signature.md](./http-signature.md)。
     **Refresh**：body 同时带 `access_token`（可过期）+ `refresh_token`，主体一致才轮换。

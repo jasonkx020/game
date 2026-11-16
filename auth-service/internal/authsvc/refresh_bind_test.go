@@ -2,6 +2,9 @@ package authsvc_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"testing"
 	"time"
@@ -11,6 +14,15 @@ import (
 	"github.com/example/auth-service/internal/store"
 	"github.com/example/auth-service/internal/token"
 )
+
+func testES256Manager(t *testing.T, ttl time.Duration) *token.Manager {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return token.NewManager(key, "test", ttl)
+}
 
 // memory harness for dual-token rules without a live DB.
 type memStore struct {
@@ -127,8 +139,9 @@ func dualRefresh(
 	}, nil
 }
 
-func setup() (*token.Manager, *fakeRepo, string, string) {
-	mgr := token.NewManager("test-secret-at-least-32-bytes-long!!", 2*time.Hour)
+func setup(t *testing.T) (*token.Manager, *fakeRepo, string, string) {
+	t.Helper()
+	mgr := testES256Manager(t, 2*time.Hour)
 	m := newMem()
 	phone := "13900000007"
 	acc := &store.Account{ID: 7, PrincipalType: token.PrincipalPlayer, Phone: &phone, Role: token.RolePlayer, Status: "active"}
@@ -141,7 +154,7 @@ func setup() (*token.Manager, *fakeRepo, string, string) {
 }
 
 func TestDualRefreshSuccess(t *testing.T) {
-	mgr, repo, access, refresh := setup()
+	mgr, repo, access, refresh := setup(t)
 	pair, err := dualRefresh(mgr, repo, access, refresh, token.PrincipalPlayer)
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +169,7 @@ func TestDualRefreshSuccess(t *testing.T) {
 }
 
 func TestDualRefreshGraceAllowsRetryWithOldToken(t *testing.T) {
-	mgr, repo, access, refresh := setup()
+	mgr, repo, access, refresh := setup(t)
 	pair1, err := dualRefresh(mgr, repo, access, refresh, token.PrincipalPlayer)
 	if err != nil {
 		t.Fatal(err)
@@ -176,21 +189,21 @@ func TestDualRefreshGraceAllowsRetryWithOldToken(t *testing.T) {
 }
 
 func TestDualRefreshRejectsMissingAccess(t *testing.T) {
-	mgr, repo, _, refresh := setup()
+	mgr, repo, _, refresh := setup(t)
 	if _, err := dualRefresh(mgr, repo, "", refresh, token.PrincipalPlayer); !errors.Is(err, authsvc.ErrBadRequest) {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestDualRefreshRejectsMissingRefresh(t *testing.T) {
-	mgr, repo, access, _ := setup()
+	mgr, repo, access, _ := setup(t)
 	if _, err := dualRefresh(mgr, repo, access, "", token.PrincipalPlayer); !errors.Is(err, authsvc.ErrBadRequest) {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestDualRefreshRejectsTamperedAccess(t *testing.T) {
-	mgr, repo, access, refresh := setup()
+	mgr, repo, access, refresh := setup(t)
 	tampered := access[:len(access)-6] + "AAAAAA"
 	if _, err := dualRefresh(mgr, repo, tampered, refresh, token.PrincipalPlayer); err == nil {
 		t.Fatal("expected reject")
@@ -198,7 +211,7 @@ func TestDualRefreshRejectsTamperedAccess(t *testing.T) {
 }
 
 func TestDualRefreshRejectsSubjectMismatch(t *testing.T) {
-	mgr, repo, _, refresh := setup()
+	mgr, repo, _, refresh := setup(t)
 	otherAccess, _, _ := mgr.IssueAccess(99, token.RolePlayer, token.PrincipalPlayer, "13900000099", "p99")
 	if _, err := dualRefresh(mgr, repo, otherAccess, refresh, token.PrincipalPlayer); !errors.Is(err, authsvc.ErrUnauthorized) {
 		t.Fatalf("got %v", err)
@@ -206,7 +219,7 @@ func TestDualRefreshRejectsSubjectMismatch(t *testing.T) {
 }
 
 func TestDualRefreshRejectsExpiredRefresh(t *testing.T) {
-	mgr, repo, access, _ := setup()
+	mgr, repo, access, _ := setup(t)
 	raw, _ := refreshtoken.NewOpaque()
 	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(-time.Minute), time.Now().Add(-time.Minute))
 	if _, err := dualRefresh(mgr, repo, access, raw, token.PrincipalPlayer); !errors.Is(err, authsvc.ErrUnauthorized) {
@@ -215,7 +228,7 @@ func TestDualRefreshRejectsExpiredRefresh(t *testing.T) {
 }
 
 func TestDualRefreshAllowsExpiredAccess(t *testing.T) {
-	mgr := token.NewManager("test-secret-at-least-32-bytes-long!!", 1*time.Second)
+	mgr := testES256Manager(t, 1*time.Second)
 	m := newMem()
 	m.accounts[7] = &store.Account{ID: 7, PrincipalType: token.PrincipalPlayer, Role: token.RolePlayer, Status: "active"}
 	repo := &fakeRepo{m: m}

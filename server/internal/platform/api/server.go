@@ -63,7 +63,7 @@ func (s *Server) Register(r *gin.Engine) {
 		AppID: s.cfg.AppID, AppSecret: s.cfg.HMACSecret, Skip: false,
 	}, s.rdb)
 
-	jwtPlayer := httpmw.RequirePrincipalType(s.cfg.JWTSecret, user.PrincipalTypePlayer)
+	jwtPlayer := httpmw.RequirePrincipalType(s.cfg.JWTPublicKey, user.PrincipalTypePlayer)
 
 	v1 := r.Group("/v1")
 	v1.Use(sig)
@@ -72,7 +72,7 @@ func (s *Server) Register(r *gin.Engine) {
 		// Admin 运营 API 由独立 admin-api 提供（默认 :8082）；本进程不依赖 admin-api。
 
 		clubRead := v1.Group("")
-		clubRead.Use(httpmw.JWT(s.cfg.JWTSecret))
+		clubRead.Use(httpmw.JWT())
 		{
 			clubRead.GET("/clubs/:club_id", s.getClub)
 			clubRead.GET("/clubs/:club_id/members", s.listClubMembers)
@@ -80,7 +80,7 @@ func (s *Server) Register(r *gin.Engine) {
 		}
 
 		catalogRead := v1.Group("")
-		catalogRead.Use(httpmw.JWT(s.cfg.JWTSecret))
+		catalogRead.Use(httpmw.JWT())
 		{
 			catalogRead.GET("/games", s.listGames)
 			catalogRead.GET("/games/:game_id/config", s.getGameConfig)
@@ -88,7 +88,7 @@ func (s *Server) Register(r *gin.Engine) {
 		}
 
 		auth := v1.Group("")
-		auth.Use(httpmw.JWT(s.cfg.JWTSecret), jwtPlayer)
+		auth.Use(httpmw.JWT(), jwtPlayer)
 		{
 			auth.GET("/user/profile", s.profile)
 			auth.PUT("/user/profile", s.putProfile)
@@ -139,7 +139,7 @@ func (s *Server) accessClaims(c *gin.Context) (*user.AccessClaims, error) {
 			token = auth[7:]
 		}
 	}
-	claims, err := user.ParseAccessClaims(token, []byte(s.cfg.JWTSecret))
+	claims, err := user.ParseAccessClaims(token, s.cfg.JWTPublicKey)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
 		return nil, err

@@ -47,5 +47,5 @@ X-Signature = hex_lower(HMAC-SHA256(app_secret, canonical_string))
 ## 业务服接入注意
 
 - 登录/刷新/注册：**直连 auth-service**（默认 `:8081`），不要打到 game-api。
-- 业务 API：带未过期 `access_token`，用**同一** `JWT_SECRET` 验签；`sub` = `account_id`。
+- 业务 API：带未过期 `access_token`，用 Auth **ES256 公钥**验签；`sub` = `account_id`。
 - Refresh：**必须**同时上传过期也可的 `access_token` + 有效 `refresh_token`。

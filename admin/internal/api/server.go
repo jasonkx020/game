@@ -68,13 +68,13 @@ func (s *Server) Register(r *gin.Engine) {
 		AppID: s.cfg.AppID, AppSecret: s.cfg.HMACSecret, Skip: false,
 	}, s.rdb)
 
-	jwtAdmin := httpmw.RequirePrincipalType(s.cfg.JWTSecret, user.PrincipalTypeAdmin)
+	jwtAdmin := httpmw.RequirePrincipalType(s.cfg.JWTPublicKey, user.PrincipalTypeAdmin)
 
 	v1 := r.Group("/v1")
 	v1.Use(sig)
 	{
 		admin := v1.Group("/admin")
-		admin.Use(httpmw.JWT(s.cfg.JWTSecret), jwtAdmin, httpmw.RequireRole(s.cfg.JWTSecret, user.RolePlatformAdmin, user.RoleClubAdmin))
+		admin.Use(httpmw.JWT(), jwtAdmin, httpmw.RequireRole(s.cfg.JWTPublicKey, user.RolePlatformAdmin, user.RoleClubAdmin))
 		{
 			admin.POST("/clubs", s.createClub)
 			admin.POST("/clubs/:club_id/members", s.addClubMember)
@@ -90,7 +90,7 @@ func (s *Server) Register(r *gin.Engine) {
 			admin.GET("/wallet/recharge/history", s.adminRechargeHistory)
 
 			adminPlatform := admin.Group("")
-			adminPlatform.Use(httpmw.RequireRole(s.cfg.JWTSecret, user.RolePlatformAdmin))
+			adminPlatform.Use(httpmw.RequireRole(s.cfg.JWTPublicKey, user.RolePlatformAdmin))
 			{
 				adminPlatform.GET("/users", s.adminListUsers)
 				adminPlatform.POST("/users", s.createAdminUser)
@@ -110,7 +110,7 @@ func (s *Server) Register(r *gin.Engine) {
 		}
 
 		adminRead := v1.Group("")
-		adminRead.Use(httpmw.JWT(s.cfg.JWTSecret), jwtAdmin)
+		adminRead.Use(httpmw.JWT(), jwtAdmin)
 		{
 			adminRead.GET("/games", s.listGames)
 			adminRead.GET("/games/:game_id/config", s.getGameConfig)
@@ -146,7 +146,7 @@ func (s *Server) accessClaims(c *gin.Context) (*user.AccessClaims, error) {
 			token = auth[7:]
 		}
 	}
-	claims, err := user.ParseAccessClaims(token, []byte(s.cfg.JWTSecret))
+	claims, err := user.ParseAccessClaims(token, s.cfg.JWTPublicKey)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "invalid token", "request_id": c.GetString("request_id")})
 		return nil, err

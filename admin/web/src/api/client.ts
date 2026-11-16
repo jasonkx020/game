@@ -18,9 +18,20 @@ export interface ApiError {
   request_id?: string
 }
 
-function isAuthFailure(err: ApiError, httpStatus: number): boolean {
+/** Access JWT missing/expired — NOT business 403 (permission ≠ session dead). */
+function isAccessAuthFailure(err: ApiError, httpStatus: number): boolean {
   if (httpStatus === 401) return true
   return err.code === 1001 || err.code === 401
+}
+
+/**
+ * Hard reject from /admin/auth/refresh → clear session & re-login.
+ * Do not use for ordinary business API errors (including 403).
+ */
+function isRefreshHardReject(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const code = (err as ApiError).code
+  return code === 1001 || code === 401 || code === 403 || code === 400
 }
 
 function isAuthBootstrapPath(path: string): boolean {
@@ -124,8 +135,7 @@ async function refreshAccessToken(): Promise<void> {
       }
 
       lastErr = result.err
-      const code = result.err.code
-      if (code === 1001 || code === 401 || code === 403 || code === 400) {
+      if (isRefreshHardReject(result.err)) {
         throw result.err
       }
       if (attempt === maxAttempts - 1) throw result.err
@@ -148,6 +158,7 @@ function redirectLogin(): void {
 /**
  * Base request used by every API call (admin-api + auth-service).
  * On access expiry (401/1001): refresh once (single-flight) then retry.
+ * Business 403 never clears tokens; only refresh hard-reject does.
  */
 async function request<T>(
   base: string,
@@ -160,7 +171,7 @@ async function request<T>(
   if (first.ok) return first.data
 
   const canRefresh =
-    !isAuthBootstrapPath(signPath) && isAuthFailure(first.err, first.status)
+    !isAuthBootstrapPath(signPath) && isAccessAuthFailure(first.err, first.status)
 
   if (!canRefresh) {
     throw first.err
@@ -168,16 +179,20 @@ async function request<T>(
 
   try {
     await refreshAccessToken()
-  } catch {
-    clearSession()
-    redirectLogin()
+  } catch (refreshErr) {
+    if (isRefreshHardReject(refreshErr)) {
+      clearSession()
+      redirectLogin()
+      throw refreshErr
+    }
+    // Network / 5xx on refresh: keep tokens
     throw first.err
   }
 
   const second = await signedFetch<T>(base, method, path, body)
   if (second.ok) return second.data
 
-  if (isAuthFailure(second.err, second.status)) {
+  if (isAccessAuthFailure(second.err, second.status)) {
     clearSession()
     redirectLogin()
   }

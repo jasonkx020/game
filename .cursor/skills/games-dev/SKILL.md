@@ -93,7 +93,7 @@ make build-linux    # server/bin/game-api, server/bin/game
 make docker-build   # Linux 镜像（context=server/）
 ```
 
-环境变量：复制 `server/.env.example` → `server/.env`。生产勿用 dev 默认 `JWT_SECRET` / `HMAC_SECRET`。
+环境变量：复制 `server/.env.example` → `server/.env`。Access JWT 为 ES256（Auth 私钥 + 业务公钥）；生产勿用 dev 默认 `HMAC_SECRET` / dev PEM。
 
 ## 目录地图
 

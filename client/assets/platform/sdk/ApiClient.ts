@@ -96,12 +96,24 @@ export interface ApiError {
   request_id?: string
 }
 
+/**
+ * Hard reject from /auth/refresh (or missing local pair) → clear tokens & re-login.
+ * Business API 403 (permission) is NOT included — session stays valid.
+ */
+export function isRefreshHardReject(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const code = (err as ApiError).code
+  return code === 1001 || code === 401 || code === 403 || code === 400
+}
+
 export class ApiClient {
   private token = ''
   private refresh = ''
   private cfg: ClientConfig
   /** Optional persist hook; called after tokens are successfully updated in memory. */
   private onTokensUpdated: ((pair: LoginResult) => void) | null = null
+  /** Fired only when refresh is hard-rejected; wipe persisted session / force login. */
+  private onSessionInvalid: ((err: unknown) => void) | null = null
   private refreshInFlight: Promise<LoginResult> | null = null
 
   constructor(cfg: Partial<ClientConfig> = {}) {
@@ -120,6 +132,10 @@ export class ApiClient {
     this.onTokensUpdated = cb
   }
 
+  setOnSessionInvalid(cb: ((err: unknown) => void) | null): void {
+    this.onSessionInvalid = cb
+  }
+
   setAccessToken(token: string): void {
     this.token = token
   }
@@ -132,6 +148,12 @@ export class ApiClient {
   clearAccessToken(): void {
     this.token = ''
     this.refresh = ''
+  }
+
+  /** Clear in-memory tokens and notify SessionStore (disk wipe). */
+  invalidateSession(err?: unknown): void {
+    this.clearAccessToken()
+    this.onSessionInvalid?.(err ?? { code: 1001, message: 'session invalid' })
   }
 
   async sendCode(params: {
@@ -626,10 +648,11 @@ export class ApiClient {
         err.message = `HTTP ${res.status}`
       }
 
-      const isAuthFail = res.status === 401 || err.code === 1001 || err.code === 401
+      // Access expired / missing only — NOT business 403 (permission ≠ session dead).
+      const isAccessAuthFail = res.status === 401 || err.code === 1001 || err.code === 401
       const canRefresh =
         !opts.skipAuthRetry &&
-        isAuthFail &&
+        isAccessAuthFail &&
         !path.includes('/auth/refresh') &&
         !path.includes('/auth/logout') &&
         !path.includes('/auth/sign-in') &&
@@ -641,7 +664,12 @@ export class ApiClient {
         try {
           await this.refreshTokens()
           return this.request<T>(method, path, body, baseUrl, { skipAuthRetry: true })
-        } catch {
+        } catch (refreshErr) {
+          if (isRefreshHardReject(refreshErr)) {
+            this.invalidateSession(refreshErr)
+            throw refreshErr
+          }
+          // Network / 5xx on refresh: keep tokens; surface original business error.
           throw err
         }
       }
@@ -659,8 +687,8 @@ function isRetryableRefreshError(err: unknown): boolean {
   if (typeof code !== 'number') {
     return true
   }
-  // Auth / client errors: do not retry (invalid or expired refresh outside grace)
-  if (code === 1001 || code === 401 || code === 403 || code === 400) {
+  // Hard reject from refresh: do not retry (invalid/expired/disabled outside grace)
+  if (isRefreshHardReject(err)) {
     return false
   }
   // HTTP 5xx or transient

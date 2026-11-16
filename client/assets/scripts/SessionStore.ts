@@ -1,5 +1,11 @@
 import { sys } from 'cc'
-import { ApiClient, CreateRoomResult, LoginResult, UserProfile } from '../platform/sdk/ApiClient'
+import {
+  ApiClient,
+  CreateRoomResult,
+  LoginResult,
+  UserProfile,
+  isRefreshHardReject,
+} from '../platform/sdk/ApiClient'
 import type { GameSession } from '../platform/sdk/GameSession'
 
 const TOKEN_STORAGE_KEY = 'games_auth_tokens'
@@ -70,6 +76,12 @@ class SessionStoreImpl {
     this.api.setOnTokensUpdated((pair) => {
       this.login = pair
       this.persistTokens(pair)
+    })
+    // Only when /auth/refresh hard-rejects — never for business 403.
+    this.api.setOnSessionInvalid(() => {
+      this.login = null
+      this.profile = null
+      this.clearPersistedTokens()
     })
   }
 
@@ -157,12 +169,12 @@ class SessionStoreImpl {
       await this.loadProfileQuietly()
       return 'ok'
     } catch (e) {
-      // Drop in-memory session; decide whether to wipe disk by error class.
+      // Drop in-memory session; wipe disk only on refresh hard-reject (not business 403).
       this.api.clearAccessToken()
       this.login = null
       this.profile = null
-      if (isAuthRejectError(e)) {
-        console.warn('[SessionStore] restore auth rejected, need re-login', e)
+      if (isRefreshHardReject(e)) {
+        console.warn('[SessionStore] restore refresh rejected, need re-login', e)
         this.clearPersistedTokens()
         return 'auth'
       }
@@ -198,12 +210,6 @@ class SessionStoreImpl {
     this.clearPersistedTokens()
     this.resetRoom()
   }
-}
-
-function isAuthRejectError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const code = (err as { code?: number }).code
-  return code === 1001 || code === 401 || code === 403 || code === 400
 }
 
 export const SessionStore = new SessionStoreImpl()

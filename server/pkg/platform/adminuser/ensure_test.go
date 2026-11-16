@@ -14,7 +14,7 @@ func TestEnsureFromAuth_RefreshesPhoneKeepsNickname(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	svc := NewService(sqlx.NewDb(db, "sqlmock"), "secret", "123456")
+	svc := NewService(sqlx.NewDb(db, "sqlmock"))
 
 	aid := int64(5)
 	rows := sqlmock.NewRows([]string{

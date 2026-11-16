@@ -1,6 +1,7 @@
 package token
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"strconv"
@@ -29,15 +30,40 @@ type Claims struct {
 }
 
 type Manager struct {
-	secret []byte
-	ttl    time.Duration
+	privateKey *ecdsa.PrivateKey
+	publicKey  *ecdsa.PublicKey
+	kid        string
+	ttl        time.Duration
 }
 
-func NewManager(secret string, accessTTL time.Duration) *Manager {
-	return &Manager{secret: []byte(secret), ttl: accessTTL}
+func NewManager(privateKey *ecdsa.PrivateKey, kid string, accessTTL time.Duration) *Manager {
+	if kid == "" {
+		kid = "es256-1"
+	}
+	return &Manager{
+		privateKey: privateKey,
+		publicKey:  &privateKey.PublicKey,
+		kid:        kid,
+		ttl:        accessTTL,
+	}
 }
+
+// NewVerifier builds a parse-only manager (tests / callers with public key only).
+func NewVerifier(publicKey *ecdsa.PublicKey, kid string, accessTTL time.Duration) *Manager {
+	if kid == "" {
+		kid = "es256-1"
+	}
+	return &Manager{publicKey: publicKey, kid: kid, ttl: accessTTL}
+}
+
+func (m *Manager) KeyID() string { return m.kid }
+
+func (m *Manager) PublicKey() *ecdsa.PublicKey { return m.publicKey }
 
 func (m *Manager) IssueAccess(accountID int64, role, principalType, phone, nickname string) (string, int, error) {
+	if m.privateKey == nil {
+		return "", 0, errors.New("private key required to issue tokens")
+	}
 	now := time.Now()
 	exp := now.Add(m.ttl)
 	claims := jwt.MapClaims{
@@ -53,8 +79,9 @@ func (m *Manager) IssueAccess(accountID int64, role, principalType, phone, nickn
 	if nickname != "" {
 		claims["nickname"] = nickname
 	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	s, err := t.SignedString(m.secret)
+	t := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	t.Header["kid"] = m.kid
+	s, err := t.SignedString(m.privateKey)
 	if err != nil {
 		return "", 0, err
 	}
@@ -63,7 +90,7 @@ func (m *Manager) IssueAccess(accountID int64, role, principalType, phone, nickn
 
 // Parse validates signature and claims including expiry.
 func (m *Manager) Parse(tokenStr string) (*Claims, error) {
-	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodES256.Alg()}))
 	t, err := parser.Parse(tokenStr, m.keyFunc)
 	if err != nil {
 		return nil, err
@@ -77,7 +104,7 @@ func (m *Manager) Parse(tokenStr string) (*Claims, error) {
 // ParseAllowExpired validates signature and structure but ignores exp.
 func (m *Manager) ParseAllowExpired(tokenStr string) (*Claims, error) {
 	parser := jwt.NewParser(
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodES256.Alg()}),
 		jwt.WithoutClaimsValidation(),
 	)
 	t, err := parser.Parse(tokenStr, m.keyFunc)
@@ -88,10 +115,13 @@ func (m *Manager) ParseAllowExpired(tokenStr string) (*Claims, error) {
 }
 
 func (m *Manager) keyFunc(t *jwt.Token) (interface{}, error) {
-	if t.Method != jwt.SigningMethodHS256 {
-		return nil, fmt.Errorf("unexpected signing method")
+	if t.Method != jwt.SigningMethodES256 {
+		return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 	}
-	return m.secret, nil
+	if m.publicKey == nil {
+		return nil, errors.New("public key not configured")
+	}
+	return m.publicKey, nil
 }
 
 func mapClaims(raw jwt.Claims) (*Claims, error) {
