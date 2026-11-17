@@ -67,9 +67,6 @@ func New(
 func (s *Server) Register(r *gin.Engine) {
 	r.Use(gin.Recovery(), httpmw.RequestID(), httpmw.CORS(s.cfg.CORSOrigins))
 
-	// Embedded SPA same-origin login: proxy auth routes to auth-service (:8081).
-	mountAuthProxy(r, s.cfg.AuthBaseURL)
-
 	sig := httpmw.Signature(httpmw.SignatureConfig{
 		AppID: s.cfg.AppID, AppSecret: s.cfg.HMACSecret, Skip: false,
 	}, s.rdb)
