@@ -26,7 +26,7 @@ alwaysApply: false
 - `scripts/**` 直接 import 某游戏实现（须 `GameModuleRegistry` + Bundle）
 - 手改 `generated/`；在 Lobby/`RoomScene` 为新游戏写死分支
 - 客户端本地权威判胜负/结算；未签名乱调 `/v1` 业务 API
-- 把 `library/`、`temp/`、`build/` 当源码改
+- 把 `library/`、`temp/`、`build/`、`profiles/` 当源码改或提交
 
 ## 检查
 

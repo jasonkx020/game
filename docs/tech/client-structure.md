@@ -16,7 +16,7 @@ client/
 ├── scripts/                # Node 工具（proto 补丁、脚手架、边界检查）
 ├── tests/                  # Vitest（不依赖编辑器）
 ├── settings/               # Creator 工程设置（设计分辨率等）
-├── profiles/               # 编辑器个人配置（可提交部分）
+├── profiles/               # 编辑器本机偏好（gitignore，勿上库）
 ├── .creator/               # Creator 工程元数据
 ├── import-map.json         # npm 模块映射（bufbuild 等）
 ├── package.json            # creator.version 锁定 3.8.8；npm test
@@ -36,6 +36,7 @@ client/
 | `scripts/` | 仓库级 Node 脚本 | 不放游戏逻辑 |
 | `tests/` | Vitest | 不依赖 `cc` 运行时的纯逻辑 |
 | `settings/` | 设计分辨率、构建配置 | 改分辨率须对齐 UI 规范 |
+| `profiles/` | 编辑器本机偏好 | **勿上库**（`.gitignore`） |
 | `library/` / `temp/` / `build/` | 缓存与产物 | **禁止**当源码编辑；勿提交大缓存 |
 
 ---
@@ -150,6 +151,7 @@ flowchart TB
 | :--- | :--- |
 | `library/` | AssetDB 导入缓存 |
 | `temp/` | 预览 / packer 临时 |
+| `profiles/` | 编辑器本机偏好（上次场景、Gizmo 等） |
 | `build/` | Web/原生构建输出；`sync-bundles` 可读 `build/web-desktop/remote` |
 | `node_modules/` | npm |
 | `*.meta` | Creator 资源 UUID；改名/移动用编辑器，避免 UUID 断裂 |
