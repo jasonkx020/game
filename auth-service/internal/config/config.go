@@ -19,6 +19,7 @@ type Config struct {
 	AppID              string
 	DevSMSCode         string
 	DevEmailCode       string
+	ListenHost         string // bind address; default 0.0.0.0
 	AuthHTTPPort       string
 	AccessTokenExpire  time.Duration
 	RefreshTokenExpire time.Duration
@@ -56,6 +57,7 @@ func Load() (*Config, error) {
 	v.SetDefault("APP_ID", "cocos-dev")
 	v.SetDefault("DEV_SMS_CODE", "123456")
 	v.SetDefault("DEV_EMAIL_CODE", "123456")
+	v.SetDefault("HTTP_LISTEN_HOST", "0.0.0.0")
 	v.SetDefault("AUTH_HTTP_PORT", "8081")
 	v.SetDefault("ACCESS_TOKEN_EXPIRE_MINUTES", 120)
 	v.SetDefault("REFRESH_TOKEN_EXPIRE_DAYS", 90)
@@ -101,6 +103,7 @@ func Load() (*Config, error) {
 		AppID:                   v.GetString("APP_ID"),
 		DevSMSCode:              v.GetString("DEV_SMS_CODE"),
 		DevEmailCode:            v.GetString("DEV_EMAIL_CODE"),
+		ListenHost:              firstNonEmpty(v.GetString("HTTP_LISTEN_HOST"), "0.0.0.0"),
 		AuthHTTPPort:            v.GetString("AUTH_HTTP_PORT"),
 		AccessTokenExpire:       time.Duration(accessMin) * time.Minute,
 		RefreshTokenExpire:      time.Duration(refreshDays) * 24 * time.Hour,
@@ -203,4 +206,27 @@ func findEnvFile() string {
 		}
 		dir = parent
 	}
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, s := range vals {
+		if strings.TrimSpace(s) != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// ListenAddr builds host:port for bind (empty host → 0.0.0.0).
+func ListenAddr(host, port string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port = strings.TrimPrefix(strings.TrimSpace(port), ":")
+	return host + ":" + port
+}
+
+func (c *Config) AuthAPIAddr() string {
+	return ListenAddr(c.ListenHost, c.AuthHTTPPort)
 }

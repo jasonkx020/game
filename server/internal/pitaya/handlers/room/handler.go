@@ -3,6 +3,7 @@ package room
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/pitaya/settleapply"
 	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/settlement"
 	"github.com/example/game/pkg/platform/wallet"
 )
@@ -33,16 +35,17 @@ type Handler struct {
 	audit     *audit.Generator
 	actionLog *actionlog.Repo
 	roomMeta  *roommeta.Repo
+	risk      *risk.Service
 	settle    settleapply.Deps
 }
 
-func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, db *sqlx.DB, w *wallet.Service, settler *settlement.Service) *Handler {
+func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, db *sqlx.DB, w *wallet.Service, settler *settlement.Service, riskSvc *risk.Service) *Handler {
 	return &Handler{
 		store: store, committer: committer, audit: gen, actionLog: log,
-		roomMeta: roommeta.NewRepo(db),
+		roomMeta: roommeta.NewRepo(db), risk: riskSvc,
 		settle: settleapply.Deps{
 			Wallet: w, Settlement: settler, Committer: committer, Audit: gen, ActionLog: log,
-			SkipUser: bot.IsBot,
+			Risk: riskSvc, SkipUser: bot.IsBot,
 		},
 	}
 }
@@ -83,21 +86,64 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 	room.Lock()
 	defer room.Unlock()
 
+	ip := s.String("client_ip")
+	deviceID := s.String("device_id")
+	var lat, lng *float64
+	if req.Lat != nil {
+		v := req.GetLat()
+		lat = &v
+	}
+	if req.Lng != nil {
+		v := req.GetLng()
+		lng = &v
+	}
+	presencePayload, _ := json.Marshal(map[string]interface{}{
+		"ip": ip, "device_id": deviceID, "lat": lat, "lng": lng,
+	})
+
 	rejoined := false
 	seatInfo, ok := room.Seats[userID]
 	if ok {
 		rejoined = true
 		seatInfo.Online = true
 		seatInfo.Trusteeship = false // reconnect clears trusteeship
+		seatInfo.ClientIP, seatInfo.DeviceID, seatInfo.Lat, seatInfo.Lng = ip, deviceID, lat, lng
 	} else if req.GetAsSpectator() {
+		if h.risk != nil {
+			if err := h.risk.CheckPlayAccess(ctx, int64(userID), time.Now()); err != nil {
+				return nil, pitaya.Error(err, joinRiskCode(err))
+			}
+		}
 		seatInfo = &runtime.Seat{
 			UserID: userID, Seat: room.NextSpectatorSeat(), Nickname: "p" + uid,
 			Online: true, Role: runtime.SeatRoleSpectator,
+			ClientIP: ip, DeviceID: deviceID, Lat: lat, Lng: lng,
 		}
 		room.Seats[userID] = seatInfo
 		room.RoomSeq++
-		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN_SPECTATOR", int64(userID), h.audit.Next(), []byte("{}"))
+		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN_SPECTATOR", int64(userID), h.audit.Next(), presencePayload)
 	} else {
+		if h.risk != nil {
+			if err := h.risk.CheckPlayAccess(ctx, int64(userID), time.Now()); err != nil {
+				return nil, pitaya.Error(err, joinRiskCode(err))
+			}
+			peers := make([]risk.Presence, 0, len(room.Seats))
+			for _, seat := range room.Seats {
+				if seat.Role != runtime.SeatRolePlayer {
+					continue
+				}
+				peers = append(peers, risk.Presence{
+					PlayerID: int64(seat.UserID), IP: seat.ClientIP, DeviceID: seat.DeviceID,
+					Lat: seat.Lat, Lng: seat.Lng,
+				})
+			}
+			joiner := risk.Presence{
+				PlayerID: int64(userID), IP: ip, DeviceID: deviceID, Lat: lat, Lng: lng,
+			}
+			if err := h.risk.CheckJoinTable(ctx, joiner, peers, roomID, false); err != nil {
+				return nil, pitaya.Error(err, joinRiskCode(err))
+			}
+		}
 		if room.PlayerCount() >= gameMeta.MaxPlayers {
 			return nil, pitaya.Error(nil, "SEAT_FULL")
 		}
@@ -105,10 +151,11 @@ func (h *Handler) Join(ctx context.Context, req *pb.JoinReq) (*pb.JoinRsp, error
 		seatInfo = &runtime.Seat{
 			UserID: userID, Seat: seat, Nickname: "p" + uid, Online: true,
 			Role: runtime.SeatRolePlayer,
+			ClientIP: ip, DeviceID: deviceID, Lat: lat, Lng: lng,
 		}
 		room.Seats[userID] = seatInfo
 		room.RoomSeq++
-		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN", int64(userID), h.audit.Next(), []byte("{}"))
+		_ = h.actionLog.InsertRoomEvent(ctx, roomID, room.RoomSeq, "JOIN", int64(userID), h.audit.Next(), presencePayload)
 	}
 	if meta.FillBots() && !req.GetAsSpectator() {
 		bot.FillSeats(room, meta.PlayerCount)
@@ -390,6 +437,23 @@ func (h *Handler) tickRoom(roomID uuid.UUID) {
 		}
 		_ = bot.RunPending(context.Background(), room, h.settle)
 		room.Unlock()
+	}
+}
+
+func joinRiskCode(err error) string {
+	switch {
+	case errors.Is(err, risk.ErrSameIP):
+		return risk.CodeIP
+	case errors.Is(err, risk.ErrGPSNear):
+		return risk.CodeGPS
+	case errors.Is(err, risk.ErrCurfew):
+		return risk.CodeCurfew
+	case errors.Is(err, risk.ErrPlaytime):
+		return risk.CodePlaytime
+	case errors.Is(err, risk.ErrFrozen):
+		return risk.CodeFrozen
+	default:
+		return "RISK"
 	}
 }
 

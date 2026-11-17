@@ -67,13 +67,13 @@ func main() {
 	srv := api.New(cfg, svc, tokens, rdb)
 
 	httpSrv := &http.Server{
-		Addr:              ":" + cfg.AuthHTTPPort,
+		Addr:              cfg.AuthAPIAddr(),
 		Handler:           srv.Engine(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		log.Printf("auth-api listening on :%s", cfg.AuthHTTPPort)
+		log.Printf("auth-api listening on %s", httpSrv.Addr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}

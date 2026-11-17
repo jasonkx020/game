@@ -12,18 +12,21 @@ import (
 	"github.com/example/game/pkg/audit"
 	"github.com/example/game/pkg/config"
 	"github.com/example/game/pkg/db"
+	"github.com/example/game/pkg/ginutil"
 	"github.com/example/game/pkg/platform/adminuser"
 	"github.com/example/game/pkg/platform/catalog"
 	"github.com/example/game/pkg/platform/club"
 	"github.com/example/game/pkg/platform/metrics"
 	"github.com/example/game/pkg/platform/moderation"
 	"github.com/example/game/pkg/platform/player"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/wallet"
 	iredis "github.com/example/game/pkg/redis"
 )
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	ginutil.DisableColorOnWindows()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -53,13 +56,17 @@ func main() {
 	catalogSvc := catalog.NewService(sqlDB)
 	metricsSvc := metrics.NewService(sqlDB)
 	modSvc := moderation.NewService(sqlDB)
+	riskSvc := risk.NewService(sqlDB, risk.Config{
+		GPSHardBlock: cfg.RiskGPSHardBlock,
+		AutoFreeze:   cfg.RiskAutoFreeze,
+	})
 	authCLI := authclient.New(cfg.AuthBaseURL, cfg.AppID, cfg.HMACSecret)
 
-	srv := api.New(cfg, admins, players, wallets, clubs, catalogSvc, metricsSvc, modSvc, authCLI, gen, rdb, sqlDB)
+	srv := api.New(cfg, admins, players, wallets, clubs, catalogSvc, metricsSvc, modSvc, riskSvc, authCLI, gen, rdb, sqlDB)
 	r := gin.Default()
 	srv.Register(r)
 
-	addr := ":" + cfg.AdminHTTPPort
+	addr := cfg.AdminAPIAddr()
 	slog.Info("admin-api listening", "addr", addr, "auth", cfg.AuthBaseURL)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		slog.Error("server", "err", err)

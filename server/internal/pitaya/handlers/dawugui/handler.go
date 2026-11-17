@@ -17,6 +17,7 @@ import (
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/pitaya/settleapply"
 	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/settlement"
 	"github.com/example/game/pkg/platform/wallet"
 )
@@ -27,12 +28,12 @@ type Handler struct {
 	settle settleapply.Deps
 }
 
-func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, w *wallet.Service, settler *settlement.Service) *Handler {
+func New(store *runtime.Store, committer *commit.Committer, gen *audit.Generator, log *actionlog.Repo, w *wallet.Service, settler *settlement.Service, riskSvc *risk.Service) *Handler {
 	return &Handler{
 		store: store,
 		settle: settleapply.Deps{
 			Wallet: w, Settlement: settler, Committer: committer, Audit: gen, ActionLog: log,
-			SkipUser: bot.IsBot,
+			Risk: riskSvc, SkipUser: bot.IsBot,
 		},
 	}
 }

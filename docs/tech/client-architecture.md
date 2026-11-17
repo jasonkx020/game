@@ -152,21 +152,15 @@ Launch → Lobby → [HTTP 开房] → Room → [Pitaya join/ready] → GameScen
 
 ## 8. 目录
 
+**完整目录说明与开发硬约束**见 **[client-structure.md](client-structure.md)**（含 `assets/platform|scripts|games`、禁止依赖方向、`npm test` 边界检查）。
+
+摘要：
+
 ```
-client/assets/platform/
-├── sdk/
-│   ├── ApiClient.ts
-│   ├── PitayaClient.ts
-│   ├── PitayaPacket.ts
-│   ├── EventTracker.ts
-│   └── ReplayPlayer.ts
-├── lobby/
-│   ├── GameModuleRegistry.ts
-│   └── GameBundleManager.ts
-├── generated/
-│   ├── api/
-│   └── pitaya/
-client/assets/games/{gameId}/   # Remote Bundle
+client/assets/
+├── platform/     # SDK / 大厅 / 伴侣 / generated（主包）
+├── scripts/      # Launch / Lobby / Room 场景
+└── games/{id}/   # Remote Bundle（禁止互引；platform 禁止 import games）
 ```
 
 ---
@@ -180,12 +174,16 @@ client/assets/games/{gameId}/   # Remote Bundle
 5. 种子 `game_client_bundle` + migration
 6. `RoomScene` **无需修改**（通过 Registry 调用）
 
+验收：`cd client && npm test`；细则 [client-structure.md §6](client-structure.md)。
+
 ---
 
 ## 10. 相关文档
 
 | 文档 | 内容 |
 | :--- | :--- |
+| [client-structure.md](client-structure.md) | **目录地图 + 开发约束** |
+| [client/README.md](../../client/README.md) | 打开工程与联调 |
 | [replay.md](replay.md) | 回放 API |
 | [pitaya-client.md](pitaya-client.md) | PitayaClient 规范 |
 | [game-framework.md](game-framework.md) | 服务端路由 |

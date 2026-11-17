@@ -161,7 +161,7 @@ make test
 
 ## 3. 客户端步骤
 
-详见 [client-architecture.md §9](client-architecture.md)。摘要：
+详见 [client-structure.md](client-structure.md)、[client-architecture.md §9](client-architecture.md)。摘要：
 
 1. `client/assets/games/foo/`（可参考 `_template` / dawugui / liuzichong）
 2. `{Foo}Module.ts` → 注册 `GameModuleRegistry`（`registerPush` / `entryScene` 等）

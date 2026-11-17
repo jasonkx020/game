@@ -1,0 +1,37 @@
+---
+description: Cocos 客户端目录边界与开发硬约束（platform / games / scripts）
+globs: client/**/*.{ts,tsx,scene,mjs,md}
+alwaysApply: false
+---
+
+# 客户端目录边界（AI / 开发必遵）
+
+完整说明：[docs/tech/client-structure.md](../../docs/tech/client-structure.md)。UI 另见 `cocos-ui.mdc`。
+
+## 放哪里
+
+| 需求 | 路径 |
+| :--- | :--- |
+| 平台 SDK / 签名 / 进房 | `client/assets/platform/sdk/` |
+| 大厅 / Bundle / Registry | `client/assets/platform/lobby/` |
+| 伴侣 | `client/assets/platform/companion/` |
+| 登录/大厅/房间场景 | `client/assets/scripts/scenes/` |
+| 单游戏逻辑与美术 | `client/assets/games/{gameId}/` |
+| 生成 proto | `client/assets/platform/generated/`（禁止手改） |
+
+## 禁止
+
+- `platform/**` import `games/**`（**例外**：仅 `GameBundleManager.ts` 可 dynamic import `*Module` 做内置兜底）
+- `games/a` import `games/b`
+- `scripts/**` 直接 import 某游戏实现（须 `GameModuleRegistry` + Bundle）
+- 手改 `generated/`；在 Lobby/`RoomScene` 为新游戏写死分支
+- 客户端本地权威判胜负/结算；未签名乱调 `/v1` 业务 API
+- 把 `library/`、`temp/`、`build/` 当源码改
+
+## 检查
+
+```bash
+cd client && npm test   # Vitest + scripts/check-imports.mjs
+```
+
+新游戏：复制 `games/_template/`，实现 Module + PushHandler，编辑器设 Remote Bundle；步骤见 [new-game-guide.md](../../docs/tech/new-game-guide.md)。

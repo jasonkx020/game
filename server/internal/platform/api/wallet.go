@@ -1,9 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/example/game/pkg/platform/risk"
 )
 
 func (s *Server) roomCardBalance(c *gin.Context) {
@@ -37,6 +40,16 @@ func (s *Server) mockRecharge(c *gin.Context) {
 	uid, err := s.playerID(c)
 	if err != nil {
 		return
+	}
+	if s.risk != nil {
+		if err := s.risk.CheckRecharge(c.Request.Context(), uid); err != nil {
+			msg := err.Error()
+			if errors.Is(err, risk.ErrMinorRecharge) {
+				msg = "minors cannot recharge"
+			}
+			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": msg, "request_id": c.GetString("request_id")})
+			return
+		}
 	}
 	var req struct {
 		ProductID string `json:"product_id"`

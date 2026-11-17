@@ -128,6 +128,7 @@ func (x *EntryRsp) GetHeartbeatIntervalSec() uint32 {
 type BindReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"` // JWT from HTTP login
+	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`          // stable client device id for risk
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -165,6 +166,13 @@ func (*BindReq) Descriptor() ([]byte, []int) {
 func (x *BindReq) GetAccessToken() string {
 	if x != nil {
 		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *BindReq) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
 	}
 	return ""
 }
@@ -231,9 +239,10 @@ const file_pitaya_connector_proto_rawDesc = "" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\"g\n" +
 	"\bEntryRsp\x12%\n" +
 	"\x0eserver_version\x18\x01 \x01(\tR\rserverVersion\x124\n" +
-	"\x16heartbeat_interval_sec\x18\x02 \x01(\rR\x14heartbeatIntervalSec\",\n" +
+	"\x16heartbeat_interval_sec\x18\x02 \x01(\rR\x14heartbeatIntervalSec\"I\n" +
 	"\aBindReq\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\">\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1b\n" +
+	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\">\n" +
 	"\aBindRsp\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x04R\x06userId\x12\x1a\n" +
 	"\bnickname\x18\x02 \x01(\tR\bnicknameB\xb2\x01\n" +

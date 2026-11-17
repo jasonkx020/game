@@ -27,6 +27,7 @@ type AccessClaims struct {
 	PrincipalType string
 	Phone         string
 	Nickname      string
+	IsMinor       bool
 }
 
 func ParseUserID(tokenStr string, pub *ecdsa.PublicKey) (int64, error) {
@@ -50,6 +51,7 @@ func ParseAccessClaims(tokenStr string, pub *ecdsa.PublicKey) (*AccessClaims, er
 	typ, _ := raw["typ"].(string)
 	phone, _ := raw["phone"].(string)
 	nickname, _ := raw["nickname"].(string)
+	isMinor, _ := raw["is_minor"].(bool)
 	if typ == "" {
 		typ = PrincipalTypePlayer
 	}
@@ -62,6 +64,7 @@ func ParseAccessClaims(tokenStr string, pub *ecdsa.PublicKey) (*AccessClaims, er
 		PrincipalType: typ,
 		Phone:         phone,
 		Nickname:      nickname,
+		IsMinor:       isMinor,
 	}, nil
 }
 

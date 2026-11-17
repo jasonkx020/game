@@ -1,0 +1,264 @@
+/v1/admin/risk/alerts:
+  get:
+    tags: [Admin]
+    summary: 风控告警列表
+    operationId: adminListRiskAlerts
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: type
+        in: query
+        schema:
+          type: string
+          enum: [same_ip, gps_near, device, abnormal_pnl, minor]
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [open, reviewed, dismissed]
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: page_size
+        in: query
+        schema: { type: integer, default: 20 }
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+/v1/admin/risk/alerts/{id}:
+  get:
+    tags: [Admin]
+    summary: 风控告警详情
+    operationId: adminGetRiskAlert
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    responses:
+      '200':
+        description: 成功
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+/v1/admin/risk/alerts/{id}/review:
+  post:
+    tags: [Admin]
+    summary: 复核风控告警（dismissed|confirmed，confirmed 可冻结）
+    operationId: adminReviewRiskAlert
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [decision]
+            properties:
+              decision:
+                type: string
+                enum: [dismissed, confirmed]
+              note: { type: string }
+              freeze: { type: boolean }
+    responses:
+      '200':
+        description: 成功
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+/v1/admin/risk/table-snapshot:
+  get:
+    tags: [Admin]
+    summary: 同桌 IP/设备/GPS 摘要
+    operationId: adminRiskTableSnapshot
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: room_id
+        in: query
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      '200':
+        description: 成功
+
+/v1/admin/risk/agents/{id}/deposit:
+  get:
+    tags: [Admin]
+    summary: 代理保证金余额与流水
+    operationId: adminGetAgentDeposit
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    responses:
+      '200':
+        description: 成功
+  post:
+    tags: [Admin]
+    summary: 缴纳或扣罚代理保证金
+    operationId: adminPostAgentDeposit
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [kind, amount_cny]
+            properties:
+              kind: { type: string, enum: [deposit, penalty] }
+              amount_cny: { type: number }
+              reason: { type: string }
+    responses:
+      '200':
+        description: 成功
+
+/v1/admin/risk/agents/{id}/withdrawals:
+  get:
+    tags: [Admin]
+    summary: 代理提现申请列表
+    operationId: adminListAgentWithdrawals
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+      - name: status
+        in: query
+        schema: { type: string }
+    responses:
+      '200':
+        description: 成功
+  post:
+    tags: [Admin]
+    summary: 提交代理提现（默认 T+7 可审）
+    operationId: adminCreateAgentWithdrawal
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount_cny]
+            properties:
+              amount_cny: { type: number }
+    responses:
+      '200':
+        description: 成功
+
+/v1/admin/risk/agents/{id}/withdrawals/{wid}/review:
+  post:
+    tags: [Admin]
+    summary: 审核代理提现（未满 T+7 需 platform_admin 强制说明）
+    operationId: adminReviewAgentWithdrawal
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+      - name: wid
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [approve]
+            properties:
+              approve: { type: boolean }
+              force: { type: boolean }
+              note: { type: string }
+    responses:
+      '200':
+        description: 成功
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

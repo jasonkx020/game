@@ -18,6 +18,8 @@ type Player struct {
 	Nickname      string     `db:"nickname"`
 	AvatarURL     string     `db:"avatar_url"`
 	Status        string     `db:"status"`
+	IsMinor       bool       `db:"is_minor"`
+	RiskStatus    string     `db:"risk_status"`
 	LastLoginAt   *time.Time `db:"last_login_at"`
 }
 
@@ -29,22 +31,27 @@ func NewService(db *sqlx.DB) *Service {
 	return &Service{db: db}
 }
 
+const playerSelectCols = `id, auth_account_id, phone, nickname, avatar_url, status,
+	COALESCE(is_minor,false) AS is_minor, COALESCE(risk_status,'active') AS risk_status, last_login_at`
+
 // EnsureFromAuth links or creates a local player for an auth-service account.
 // phone is Auth-sourced cache (refreshed from claims); nickname is Game-sourced
 // (seeded only on insert, never overwritten for existing rows).
-func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, nickname string) (*Player, error) {
+func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, nickname string, isMinor bool) (*Player, error) {
 	if accountID <= 0 {
 		return nil, fmt.Errorf("invalid account id")
 	}
 	var p Player
 	err := s.db.GetContext(ctx, &p,
-		`SELECT id, auth_account_id, phone, nickname, avatar_url, status, last_login_at
-		 FROM players WHERE auth_account_id=$1`, accountID)
+		`SELECT `+playerSelectCols+` FROM players WHERE auth_account_id=$1`, accountID)
 	if err == nil {
 		if p.Status != "" && p.Status != "active" {
 			return nil, fmt.Errorf("player disabled")
 		}
-		p, err = s.refreshPhoneCache(ctx, p, phone)
+		if p.RiskStatus == "frozen" {
+			return nil, fmt.Errorf("player risk frozen")
+		}
+		p, err = s.refreshPhoneAndMinor(ctx, p, phone, isMinor)
 		if err != nil {
 			return nil, err
 		}
@@ -53,21 +60,24 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 	}
 	if phone != "" {
 		err = s.db.GetContext(ctx, &p,
-			`SELECT id, auth_account_id, phone, nickname, avatar_url, status, last_login_at
-			 FROM players WHERE phone=$1`, phone)
+			`SELECT `+playerSelectCols+` FROM players WHERE phone=$1`, phone)
 		if err == nil {
 			if p.Status != "" && p.Status != "active" {
 				return nil, fmt.Errorf("player disabled")
 			}
+			if p.RiskStatus == "frozen" {
+				return nil, fmt.Errorf("player risk frozen")
+			}
 			now := time.Now()
 			_, err = s.db.ExecContext(ctx,
-				`UPDATE players SET auth_account_id=$1, phone=$2, updated_at=$3 WHERE id=$4`,
-				accountID, phone, now, p.ID)
+				`UPDATE players SET auth_account_id=$1, phone=$2, is_minor=$3, updated_at=$4 WHERE id=$5`,
+				accountID, phone, isMinor, now, p.ID)
 			if err != nil {
 				return nil, err
 			}
 			p.AuthAccountID = &accountID
 			p.Phone = phone
+			p.IsMinor = isMinor
 			s.ensureWallets(ctx, p.ID)
 			return &p, nil
 		}
@@ -77,9 +87,9 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 		phone = fmt.Sprintf("wx-%d", accountID)
 	}
 	err = s.db.QueryRowxContext(ctx,
-		`INSERT INTO players (phone, nickname, auth_account_id) VALUES ($1, $2, $3)
-		 RETURNING id, auth_account_id, phone, nickname, avatar_url, status, last_login_at`,
-		phone, seedNick, accountID).StructScan(&p)
+		`INSERT INTO players (phone, nickname, auth_account_id, is_minor) VALUES ($1, $2, $3, $4)
+		 RETURNING `+playerSelectCols,
+		phone, seedNick, accountID, isMinor).StructScan(&p)
 	if err != nil {
 		return nil, err
 	}
@@ -89,18 +99,23 @@ func (s *Service) EnsureFromAuth(ctx context.Context, accountID int64, phone, ni
 	return &p, nil
 }
 
-// refreshPhoneCache updates players.phone from Auth claims without touching nickname.
-func (s *Service) refreshPhoneCache(ctx context.Context, p Player, phone string) (Player, error) {
-	if phone == "" || phone == p.Phone {
+// refreshPhoneAndMinor updates phone / is_minor from Auth claims without touching nickname.
+func (s *Service) refreshPhoneAndMinor(ctx context.Context, p Player, phone string, isMinor bool) (Player, error) {
+	if (phone == "" || phone == p.Phone) && isMinor == p.IsMinor {
 		return p, nil
 	}
+	nextPhone := p.Phone
+	if phone != "" {
+		nextPhone = phone
+	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE players SET phone=$1, updated_at=$2 WHERE id=$3`,
-		phone, time.Now(), p.ID)
+		`UPDATE players SET phone=$1, is_minor=$2, updated_at=$3 WHERE id=$4`,
+		nextPhone, isMinor, time.Now(), p.ID)
 	if err != nil {
 		return p, err
 	}
-	p.Phone = phone
+	p.Phone = nextPhone
+	p.IsMinor = isMinor
 	return p, nil
 }
 

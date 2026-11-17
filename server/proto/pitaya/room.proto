@@ -11,6 +11,8 @@ message JoinReq {
   string room_id = 1;
   optional string password = 2;
   bool as_spectator = 3;
+  optional double lat = 4; // WGS84; omit to skip GPS check
+  optional double lng = 5;
 }
 
 message JoinRsp {

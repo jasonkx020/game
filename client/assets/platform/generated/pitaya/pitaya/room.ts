@@ -22,6 +22,9 @@ export interface JoinReq {
   roomId: string;
   password?: string | undefined;
   asSpectator: boolean;
+  /** WGS84; omit to skip GPS check */
+  lat?: number | undefined;
+  lng?: number | undefined;
 }
 
 export interface JoinRsp {
@@ -97,7 +100,7 @@ export interface RoomStatePush {
 }
 
 function createBaseJoinReq(): JoinReq {
-  return { roomId: "", password: undefined, asSpectator: false };
+  return { roomId: "", password: undefined, asSpectator: false, lat: undefined, lng: undefined };
 }
 
 export const JoinReq: MessageFns<JoinReq> = {
@@ -110,6 +113,12 @@ export const JoinReq: MessageFns<JoinReq> = {
     }
     if (message.asSpectator !== false) {
       writer.uint32(24).bool(message.asSpectator);
+    }
+    if (message.lat !== undefined) {
+      writer.uint32(33).double(message.lat);
+    }
+    if (message.lng !== undefined) {
+      writer.uint32(41).double(message.lng);
     }
     return writer;
   },
@@ -151,6 +160,22 @@ export const JoinReq: MessageFns<JoinReq> = {
             message.asSpectator = reader.bool();
             continue;
           }
+          case 4: {
+            if (tag !== 33) {
+              break;
+            }
+
+            message.lat = reader.double();
+            continue;
+          }
+          case 5: {
+            if (tag !== 41) {
+              break;
+            }
+
+            message.lng = reader.double();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -176,6 +201,8 @@ export const JoinReq: MessageFns<JoinReq> = {
         : isSet(object.as_spectator)
         ? globalThis.Boolean(object.as_spectator)
         : false,
+      lat: isSet(object.lat) ? globalThis.Number(object.lat) : undefined,
+      lng: isSet(object.lng) ? globalThis.Number(object.lng) : undefined,
     };
   },
 
@@ -190,6 +217,12 @@ export const JoinReq: MessageFns<JoinReq> = {
     if (message.asSpectator !== false) {
       obj.asSpectator = message.asSpectator;
     }
+    if (message.lat !== undefined) {
+      obj.lat = floatToJson(message.lat);
+    }
+    if (message.lng !== undefined) {
+      obj.lng = floatToJson(message.lng);
+    }
     return obj;
   },
 
@@ -201,6 +234,8 @@ export const JoinReq: MessageFns<JoinReq> = {
     message.roomId = object.roomId ?? "";
     message.password = object.password ?? undefined;
     message.asSpectator = object.asSpectator ?? false;
+    message.lat = object.lat ?? undefined;
+    message.lng = object.lng ?? undefined;
     return message;
   },
 };
@@ -1403,6 +1438,10 @@ function base64FromBytes(arr: Uint8Array): string {
     bin.push(globalThis.String.fromCharCode(byte));
   });
   return globalThis.btoa(bin.join(""));
+}
+
+function floatToJson(value: number | null | undefined): number | string | null | undefined {
+  return typeof value === "number" && !globalThis.Number.isFinite(value) ? globalThis.String(value) : value;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

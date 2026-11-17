@@ -26,6 +26,8 @@ type JoinReq struct {
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	Password      *string                `protobuf:"bytes,2,opt,name=password,proto3,oneof" json:"password,omitempty"`
 	AsSpectator   bool                   `protobuf:"varint,3,opt,name=as_spectator,json=asSpectator,proto3" json:"as_spectator,omitempty"`
+	Lat           *float64               `protobuf:"fixed64,4,opt,name=lat,proto3,oneof" json:"lat,omitempty"` // WGS84; omit to skip GPS check
+	Lng           *float64               `protobuf:"fixed64,5,opt,name=lng,proto3,oneof" json:"lng,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -79,6 +81,20 @@ func (x *JoinReq) GetAsSpectator() bool {
 		return x.AsSpectator
 	}
 	return false
+}
+
+func (x *JoinReq) GetLat() float64 {
+	if x != nil && x.Lat != nil {
+		return *x.Lat
+	}
+	return 0
+}
+
+func (x *JoinReq) GetLng() float64 {
+	if x != nil && x.Lng != nil {
+		return *x.Lng
+	}
+	return 0
 }
 
 type JoinRsp struct {
@@ -739,12 +755,16 @@ var File_pitaya_room_proto protoreflect.FileDescriptor
 
 const file_pitaya_room_proto_rawDesc = "" +
 	"\n" +
-	"\x11pitaya/room.proto\x12\vpitaya.room\x1a\x13pitaya/common.proto\x1a\x12pitaya/event.proto\"s\n" +
+	"\x11pitaya/room.proto\x12\vpitaya.room\x1a\x13pitaya/common.proto\x1a\x12pitaya/event.proto\"\xb1\x01\n" +
 	"\aJoinReq\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1f\n" +
 	"\bpassword\x18\x02 \x01(\tH\x00R\bpassword\x88\x01\x01\x12!\n" +
-	"\fas_spectator\x18\x03 \x01(\bR\vasSpectatorB\v\n" +
-	"\t_password\"\xcd\x02\n" +
+	"\fas_spectator\x18\x03 \x01(\bR\vasSpectator\x12\x15\n" +
+	"\x03lat\x18\x04 \x01(\x01H\x01R\x03lat\x88\x01\x01\x12\x15\n" +
+	"\x03lng\x18\x05 \x01(\x01H\x02R\x03lng\x88\x01\x01B\v\n" +
+	"\t_passwordB\x06\n" +
+	"\x04_latB\x06\n" +
+	"\x04_lng\"\xcd\x02\n" +
 	"\aJoinRsp\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x124\n" +

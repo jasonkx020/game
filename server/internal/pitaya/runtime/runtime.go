@@ -24,6 +24,11 @@ type Seat struct {
 	Online      bool
 	Role        SeatRole
 	Trusteeship bool
+	// Risk presence (not pushed to clients)
+	ClientIP string
+	DeviceID string
+	Lat      *float64
+	Lng      *float64
 }
 
 type RoomRuntime struct {

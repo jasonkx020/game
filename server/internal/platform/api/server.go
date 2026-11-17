@@ -16,6 +16,7 @@ import (
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/pkg/platform/player"
 	"github.com/example/game/internal/platform/replay"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/pkg/platform/user"
 	"github.com/example/game/pkg/platform/wallet"
@@ -32,6 +33,7 @@ type Server struct {
 	lobby     *lobby.Service
 	companion *companion.Service
 	replay    *replay.Service
+	risk      *risk.Service
 	audit     *audit.Generator
 	rdb       *goredis.Client
 }
@@ -46,13 +48,14 @@ func New(
 	lobbySvc *lobby.Service,
 	companionSvc *companion.Service,
 	replaySvc *replay.Service,
+	riskSvc *risk.Service,
 	gen *audit.Generator,
 	rdb *goredis.Client,
 ) *Server {
 	return &Server{
 		cfg: cfg, players: players, wallet: wallet, rooms: rooms,
 		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc,
-		replay: replaySvc, audit: gen, rdb: rdb,
+		replay: replaySvc, risk: riskSvc, audit: gen, rdb: rdb,
 	}
 }
 
@@ -121,7 +124,7 @@ func (s *Server) playerID(c *gin.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	p, err := s.players.EnsureFromAuth(c.Request.Context(), claims.AccountID, claims.Phone, claims.Nickname)
+	p, err := s.players.EnsureFromAuth(c.Request.Context(), claims.AccountID, claims.Phone, claims.Nickname, claims.IsMinor)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1001, "message": "player link failed", "request_id": c.GetString("request_id")})
 		return 0, err

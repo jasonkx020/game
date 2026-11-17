@@ -111,7 +111,7 @@ admin/                  # 运营独立工程
   cmd/admin-api/        :8082（API + 嵌入 SPA）
   web/                  Vue 源码
   internal/webui/       go:embed dist
-client/                 # Cocos + Platform SDK
+client/                 # Cocos + Platform SDK（目录约束见 docs/tech/client-structure.md）
 docs/tech/              技术文档与 ADR
 ```
 
@@ -127,7 +127,7 @@ docs/tech/              技术文档与 ADR
 → `server/internal/game/{id}/` Engine → `server/internal/pitaya/handlers/{id}/` Handler → `server/proto/pitaya/{id}.proto` → `make gen-proto` + `make gen-client-proto`
 
 **改客户端联调**
-→ `client/assets/platform/sdk/`（ApiClient/PitayaClient/GameSession）→ `client/assets/platform/lobby/` → `client/assets/games/{id}/`（Module/PushHandler/Bundle）
+→ 先读 [client-structure.md](../../docs/tech/client-structure.md) → `client/assets/platform/sdk/`（ApiClient/PitayaClient/GameSession）→ `lobby/` → `games/{id}/`（Module/PushHandler/Bundle）；`cd client && npm test`
 
 **改游戏大厅或用户偏好**
 → `server/internal/platform/lobby/` + `server/migrations/` + `LobbyScene.ts` + OpenAPI `lobby.yaml`

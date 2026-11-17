@@ -3,6 +3,8 @@ package settleapply
 import (
 	"context"
 	"encoding/json"
+	"math"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/example/game/internal/pitaya/commit"
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/pkg/audit"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/settlement"
 	"github.com/example/game/pkg/platform/wallet"
 )
@@ -23,8 +26,11 @@ type Deps struct {
 	Committer  *commit.Committer
 	Audit      *audit.Generator
 	ActionLog  *actionlog.Repo
+	Risk       *risk.Service
 	SkipUser   func(userID uint64) bool
 }
+
+const playtimeMinutesPerRound = 5
 
 func protoScores(settle engine.SettlementResult) []*pb.EventPlayerScore {
 	out := make([]*pb.EventPlayerScore, len(settle.Scores))
@@ -96,6 +102,26 @@ func FinishRound(ctx context.Context, deps Deps, room *runtime.RoomRuntime, sett
 		winners = append(winners, int64(settle.WinnerID))
 	}
 	_ = deps.ActionLog.EndRound(ctx, room.RoundID, "ended", winners, sn)
+	if deps.Risk != nil {
+		now := time.Now()
+		coinByUser := map[uint64]float64{}
+		if monetary != nil {
+			for _, d := range monetary.CoinDeltas {
+				coinByUser[d.UserID] = math.Abs(float64(d.Delta))
+			}
+		}
+		for _, sc := range settle.Scores {
+			if deps.SkipUser != nil && deps.SkipUser(sc.UserID) {
+				continue
+			}
+			absDelta := math.Abs(float64(sc.RuleScore))
+			if c, ok := coinByUser[sc.UserID]; ok && c > absDelta {
+				absDelta = c
+			}
+			_ = deps.Risk.EvaluateSettlement(ctx, int64(sc.UserID), absDelta, room.RoomID, room.RoundID, int64(sn))
+			_ = deps.Risk.AddPlaytime(ctx, int64(sc.UserID), playtimeMinutesPerRound, now)
+		}
+	}
 	for _, s := range room.Seats {
 		s.Ready = false
 		s.Trusteeship = false

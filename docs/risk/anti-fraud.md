@@ -2,6 +2,18 @@
 
 > 风控层 — 横切所有场域与游戏。合规话术见 [compliance.md](compliance.md)。
 
+## 实现状态
+
+| 能力 | 状态 | 入口 |
+| :--- | :--- | :--- |
+| 同桌 IP / 设备 / GPS | 已落地 | Pitaya Bind/Join → `pkg/platform/risk` |
+| 异常输赢标记 | 已落地 | 结算 `FinishRound` → `risk_alerts` |
+| 未成年人防沉迷 | 已落地 | JWT `is_minor` + 宵禁/日时长/禁充值 |
+| 代理保证金与提现 | 已落地 | Admin API `/v1/admin/risk/agents/...` |
+| 运营复核面板 | 已落地 | Admin「风控」页；OpenAPI 见 [paths/risk.yaml](../tech/openapi/paths/risk.yaml) |
+
+配置：`RISK_GPS_HARD_BLOCK`（默认 false，GPS 仅告警）、`RISK_AUTO_FREEZE`（默认 false）。
+
 ---
 
 ## 1. 同桌风控

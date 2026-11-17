@@ -18,6 +18,7 @@ type Config struct {
 	HMACSecret        string
 	AppID             string
 	DevSMSCode        string
+	ListenHost        string // bind address; default 0.0.0.0
 	GameAPIHTTPPort   string
 	AdminHTTPPort     string
 	PitayaWSPort      int
@@ -33,6 +34,9 @@ type Config struct {
 	JWTPublicKeyPEM  string
 	JWTPublicKeyFile string
 	JWTPublicKey     *ecdsa.PublicKey
+
+	RiskGPSHardBlock bool
+	RiskAutoFreeze   bool
 }
 
 func Load() (*Config, error) {
@@ -46,6 +50,7 @@ func Load() (*Config, error) {
 	v.SetDefault("HMAC_SECRET", "dev-hmac-secret")
 	v.SetDefault("APP_ID", "cocos-dev")
 	v.SetDefault("DEV_SMS_CODE", "123456")
+	v.SetDefault("HTTP_LISTEN_HOST", "0.0.0.0")
 	v.SetDefault("ADMIN_HTTP_PORT", "8082")
 	v.SetDefault("PITAYA_WS_PORT", 3250)
 	v.SetDefault("PITAYA_WS_URL", "ws://localhost:3250")
@@ -56,6 +61,8 @@ func Load() (*Config, error) {
 	v.SetDefault("LLM_TIMEOUT_SEC", 60)
 	v.SetDefault("AUTH_BASE_URL", "http://localhost:8081")
 	v.SetDefault("JWT_PUBLIC_KEY_FILE", "keys/jwt-es256-dev.pub.pem")
+	v.SetDefault("RISK_GPS_HARD_BLOCK", false)
+	v.SetDefault("RISK_AUTO_FREEZE", false)
 
 	if envPath := findEnvFile(); envPath != "" {
 		v.SetConfigFile(envPath)
@@ -76,6 +83,7 @@ func Load() (*Config, error) {
 		HMACSecret:        v.GetString("HMAC_SECRET"),
 		AppID:             v.GetString("APP_ID"),
 		DevSMSCode:        v.GetString("DEV_SMS_CODE"),
+		ListenHost:        firstNonEmpty(v.GetString("HTTP_LISTEN_HOST"), "0.0.0.0"),
 		GameAPIHTTPPort:   firstNonEmpty(v.GetString("GAME_API_HTTP_PORT"), v.GetString("PLATFORM_HTTP_PORT"), "8080"),
 		AdminHTTPPort:     firstNonEmpty(v.GetString("ADMIN_HTTP_PORT"), "8082"),
 		PitayaWSPort:      v.GetInt("PITAYA_WS_PORT"),
@@ -89,6 +97,8 @@ func Load() (*Config, error) {
 		AuthBaseURL:       firstNonEmpty(v.GetString("AUTH_BASE_URL"), "http://localhost:8081"),
 		JWTPublicKeyPEM:   v.GetString("JWT_PUBLIC_KEY_PEM"),
 		JWTPublicKeyFile:  resolveKeyPath(v.GetString("JWT_PUBLIC_KEY_FILE")),
+		RiskGPSHardBlock:  v.GetBool("RISK_GPS_HARD_BLOCK"),
+		RiskAutoFreeze:    v.GetBool("RISK_AUTO_FREEZE"),
 	}
 
 	pemBytes, err := user.ResolvePEM(cfg.JWTPublicKeyPEM, cfg.JWTPublicKeyFile)
@@ -110,6 +120,28 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// ListenAddr builds host:port for HTTP/WS bind (empty host → 0.0.0.0).
+func ListenAddr(host string, port string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port = strings.TrimPrefix(strings.TrimSpace(port), ":")
+	return host + ":" + port
+}
+
+func (c *Config) GameAPIAddr() string {
+	return ListenAddr(c.ListenHost, c.GameAPIHTTPPort)
+}
+
+func (c *Config) AdminAPIAddr() string {
+	return ListenAddr(c.ListenHost, c.AdminHTTPPort)
+}
+
+func (c *Config) PitayaWSAddr() string {
+	return ListenAddr(c.ListenHost, fmt.Sprintf("%d", c.PitayaWSPort))
 }
 
 func resolveKeyPath(p string) string {

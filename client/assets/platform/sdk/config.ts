@@ -18,7 +18,7 @@ export const defaultConfig: ClientConfig = {
   authBaseUrl:
     typeof GAME_AUTH_BASE !== 'undefined' ? GAME_AUTH_BASE : 'http://localhost:8081',
   appId: typeof GAME_APP_ID !== 'undefined' ? GAME_APP_ID : 'cocos-dev',
-  appSecret: typeof GAME_HMAC_SECRET !== 'undefined' ? GAME_HMAC_SECRET : 'dev-hmac-secret-change-me',
+  appSecret: typeof GAME_HMAC_SECRET !== 'undefined' ? GAME_HMAC_SECRET : 'tC3pMVXbxyVjKIbUonaOSRrUwI2E0axmvqg4Xb/0F64=',
   defaultWsUrl: 'ws://localhost:3250',
   requestTimeoutMs: 10000,
 }

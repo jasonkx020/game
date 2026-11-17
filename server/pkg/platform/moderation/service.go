@@ -21,6 +21,7 @@ const (
 	ActionCreate         = "create"
 	ActionUpdateNickname = "update_nickname"
 	ActionForceLogout    = "force_logout"
+	ActionRiskFreeze     = "risk_freeze"
 )
 
 type Service struct {

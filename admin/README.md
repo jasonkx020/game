@@ -23,7 +23,12 @@ docker compose -f deploy/docker-compose.gateway.yml up -d
 .\scripts\dev.ps1 run-admin-web   # :5173
 ```
 
-Admin 登录路径仍为 `/v1/admin/auth/*`。`VITE_AUTH_BASE` 默认同源；请用网关 `:8090` 或 Vite `:5173`。若浏览器直连 `:8082` 而无网关，构建前设 `VITE_AUTH_BASE=http://localhost:8081`。详见 [gateway.md](../docs/tech/gateway.md)。
+Admin 登录路径仍为 `/v1/admin/auth/*`（由 **auth-service** 处理）。`VITE_AUTH_BASE` 默认同源。
+
+- 推荐：网关 `:8090` 或 Vite `:5173`（proxy → `:8081`）
+- 直连嵌入式 admin-api `:8082`：进程会把 `/v1/admin/auth*`、`/v1/auth*` 反代到 `AUTH_BASE_URL`（默认 `http://localhost:8081`），需同时 `run-auth`
+
+详见 [gateway.md](../docs/tech/gateway.md)。
 
 ### 用户管控（platform_admin）
 

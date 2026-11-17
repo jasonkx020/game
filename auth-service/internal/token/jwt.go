@@ -25,6 +25,7 @@ type Claims struct {
 	PrincipalType string
 	Phone         string
 	Nickname      string
+	IsMinor       bool
 	ExpiresAt     time.Time
 	IssuedAt      time.Time
 }
@@ -60,18 +61,19 @@ func (m *Manager) KeyID() string { return m.kid }
 
 func (m *Manager) PublicKey() *ecdsa.PublicKey { return m.publicKey }
 
-func (m *Manager) IssueAccess(accountID int64, role, principalType, phone, nickname string) (string, int, error) {
+func (m *Manager) IssueAccess(accountID int64, role, principalType, phone, nickname string, isMinor bool) (string, int, error) {
 	if m.privateKey == nil {
 		return "", 0, errors.New("private key required to issue tokens")
 	}
 	now := time.Now()
 	exp := now.Add(m.ttl)
 	claims := jwt.MapClaims{
-		"sub":  accountID,
-		"role": role,
-		"typ":  principalType,
-		"iat":  now.Unix(),
-		"exp":  exp.Unix(),
+		"sub":      accountID,
+		"role":     role,
+		"typ":      principalType,
+		"is_minor": isMinor,
+		"iat":      now.Unix(),
+		"exp":      exp.Unix(),
 	}
 	if phone != "" {
 		claims["phone"] = phone
@@ -137,6 +139,7 @@ func mapClaims(raw jwt.Claims) (*Claims, error) {
 	typ, _ := mc["typ"].(string)
 	phone, _ := mc["phone"].(string)
 	nickname, _ := mc["nickname"].(string)
+	isMinor, _ := mc["is_minor"].(bool)
 	if typ == "" {
 		typ = PrincipalPlayer
 	}
@@ -156,6 +159,7 @@ func mapClaims(raw jwt.Claims) (*Claims, error) {
 		PrincipalType: typ,
 		Phone:         phone,
 		Nickname:      nickname,
+		IsMinor:       isMinor,
 		ExpiresAt:     exp,
 		IssuedAt:      iat,
 	}, nil

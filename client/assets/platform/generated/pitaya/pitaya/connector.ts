@@ -21,6 +21,8 @@ export interface EntryRsp {
 export interface BindReq {
   /** JWT from HTTP login */
   accessToken: string;
+  /** stable client device id for risk */
+  deviceId: string;
 }
 
 export interface BindRsp {
@@ -211,13 +213,16 @@ export const EntryRsp: MessageFns<EntryRsp> = {
 };
 
 function createBaseBindReq(): BindReq {
-  return { accessToken: "" };
+  return { accessToken: "", deviceId: "" };
 }
 
 export const BindReq: MessageFns<BindReq> = {
   encode(message: BindReq, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.accessToken !== "") {
       writer.uint32(10).string(message.accessToken);
+    }
+    if (message.deviceId !== "") {
+      writer.uint32(18).string(message.deviceId);
     }
     return writer;
   },
@@ -243,6 +248,14 @@ export const BindReq: MessageFns<BindReq> = {
             message.accessToken = reader.string();
             continue;
           }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.deviceId = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -262,6 +275,11 @@ export const BindReq: MessageFns<BindReq> = {
         : isSet(object.access_token)
         ? globalThis.String(object.access_token)
         : "",
+      deviceId: isSet(object.deviceId)
+        ? globalThis.String(object.deviceId)
+        : isSet(object.device_id)
+        ? globalThis.String(object.device_id)
+        : "",
     };
   },
 
@@ -269,6 +287,9 @@ export const BindReq: MessageFns<BindReq> = {
     const obj: any = {};
     if (message.accessToken !== "") {
       obj.accessToken = message.accessToken;
+    }
+    if (message.deviceId !== "") {
+      obj.deviceId = message.deviceId;
     }
     return obj;
   },
@@ -279,6 +300,7 @@ export const BindReq: MessageFns<BindReq> = {
   fromPartial<I extends Exact<DeepPartial<BindReq>, I>>(object: I): BindReq {
     const message = createBaseBindReq();
     message.accessToken = object.accessToken ?? "";
+    message.deviceId = object.deviceId ?? "";
     return message;
   },
 };

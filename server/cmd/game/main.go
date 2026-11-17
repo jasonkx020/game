@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -26,6 +25,7 @@ import (
 	"github.com/example/game/pkg/config"
 	"github.com/example/game/pkg/db"
 	"github.com/example/game/pkg/platform/player"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/settlement"
 	"github.com/example/game/pkg/platform/wallet"
 	iredis "github.com/example/game/pkg/redis"
@@ -59,6 +59,10 @@ func main() {
 	players := player.NewService(sqlDB)
 	wallets := wallet.NewService(sqlDB)
 	settler := settlement.New(wallets)
+	riskSvc := risk.NewService(sqlDB, risk.Config{
+		GPSHardBlock: cfg.RiskGPSHardBlock,
+		AutoFreeze:   cfg.RiskAutoFreeze,
+	})
 	store := runtime.NewStore()
 	committer := &commit.Committer{Log: logRepo, Audit: gen}
 
@@ -67,22 +71,22 @@ func main() {
 	conf.Handler.Messages.Compression = false
 	builder := pitaya.NewDefaultBuilder(true, "game", pitaya.Standalone, map[string]string{}, *conf)
 	builder.Serializer = protobuf.NewSerializer()
-	builder.AddAcceptor(acceptor.NewWSAcceptor(fmt.Sprintf(":%d", cfg.PitayaWSPort)))
+	builder.AddAcceptor(acceptor.NewWSAcceptor(cfg.PitayaWSAddr()))
 	app := builder.Build()
 	pitaya.DefaultApp = app
 	session.DefaultSessionPool = builder.SessionPool
 
 	// Client routes use lowercase methods (game.connector.entry); Pitaya defaults to Entry.
 	nameOpts := []component.Option{component.WithNameFunc(strings.ToLower)}
-	pitaya.Register(connector.New(cfg, players), append([]component.Option{component.WithName("connector")}, nameOpts...)...)
-	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB, wallets, settler), append([]component.Option{component.WithName("room")}, nameOpts...)...)
-	pitaya.Register(dawugui.New(store, committer, gen, logRepo, wallets, settler), append([]component.Option{component.WithName("dawugui")}, nameOpts...)...)
-	pitaya.Register(liuzichong.New(store, committer, gen, logRepo, wallets, settler), append([]component.Option{component.WithName("liuzichong")}, nameOpts...)...)
+	pitaya.Register(connector.New(cfg, players, riskSvc), append([]component.Option{component.WithName("connector")}, nameOpts...)...)
+	pitaya.Register(roomh.New(store, committer, gen, logRepo, sqlDB, wallets, settler, riskSvc), append([]component.Option{component.WithName("room")}, nameOpts...)...)
+	pitaya.Register(dawugui.New(store, committer, gen, logRepo, wallets, settler, riskSvc), append([]component.Option{component.WithName("dawugui")}, nameOpts...)...)
+	pitaya.Register(liuzichong.New(store, committer, gen, logRepo, wallets, settler, riskSvc), append([]component.Option{component.WithName("liuzichong")}, nameOpts...)...)
 
 	kickCtx, kickCancel := context.WithCancel(context.Background())
 	defer kickCancel()
 	opskick.StartSubscribe(kickCtx, rdb)
 
-	slog.Info("game server listening", "port", cfg.PitayaWSPort)
+	slog.Info("game server listening", "addr", cfg.PitayaWSAddr())
 	pitaya.Start()
 }

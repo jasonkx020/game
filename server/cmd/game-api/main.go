@@ -10,6 +10,7 @@ import (
 	"github.com/example/game/pkg/audit"
 	"github.com/example/game/pkg/config"
 	"github.com/example/game/pkg/db"
+	"github.com/example/game/pkg/ginutil"
 	"github.com/example/game/internal/platform/api"
 	"github.com/example/game/pkg/platform/catalog"
 	"github.com/example/game/pkg/platform/club"
@@ -18,6 +19,7 @@ import (
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/pkg/platform/player"
 	"github.com/example/game/internal/platform/replay"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/pkg/platform/wallet"
 	iredis "github.com/example/game/pkg/redis"
@@ -25,6 +27,7 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	ginutil.DisableColorOnWindows()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -59,12 +62,16 @@ func main() {
 	toolReg := companion.NewToolRegistry(sqlDB, lobbySvc, rooms, catalogSvc, cfg, gen)
 	companionSvc := companion.NewService(sqlDB, llmClient, toolReg, gen)
 	replaySvc := replay.NewService(sqlDB)
+	riskSvc := risk.NewService(sqlDB, risk.Config{
+		GPSHardBlock: cfg.RiskGPSHardBlock,
+		AutoFreeze:   cfg.RiskAutoFreeze,
+	})
 
-	srv := api.New(cfg, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, replaySvc, gen, rdb)
+	srv := api.New(cfg, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, replaySvc, riskSvc, gen, rdb)
 	r := gin.Default()
 	srv.Register(r)
 
-	addr := ":" + cfg.GameAPIHTTPPort
+	addr := cfg.GameAPIAddr()
 	slog.Info("game-api listening", "addr", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		slog.Error("server", "err", err)

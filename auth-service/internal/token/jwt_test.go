@@ -21,7 +21,7 @@ func testManager(t *testing.T, ttl time.Duration) *token.Manager {
 
 func TestIssueAndParseES256(t *testing.T) {
 	mgr := testManager(t, time.Hour)
-	raw, expIn, err := mgr.IssueAccess(42, token.RolePlayer, token.PrincipalPlayer, "13800000001", "n")
+	raw, expIn, err := mgr.IssueAccess(42, token.RolePlayer, token.PrincipalPlayer, "13800000001", "n", false)
 	if err != nil {
 		t.Fatal(err)
 	}

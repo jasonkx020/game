@@ -86,6 +86,20 @@ paths:
     $ref: './paths/admin.yaml#/~1v1~1admin~1users'
   /v1/admin/players:
     $ref: './paths/admin.yaml#/~1v1~1admin~1players'
+  /v1/admin/risk/alerts:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1alerts'
+  /v1/admin/risk/alerts/{id}:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1alerts~1{id}'
+  /v1/admin/risk/alerts/{id}/review:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1alerts~1{id}~1review'
+  /v1/admin/risk/table-snapshot:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1table-snapshot'
+  /v1/admin/risk/agents/{id}/deposit:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1agents~1{id}~1deposit'
+  /v1/admin/risk/agents/{id}/withdrawals:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1agents~1{id}~1withdrawals'
+  /v1/admin/risk/agents/{id}/withdrawals/{wid}/review:
+    $ref: './paths/risk.yaml#/~1v1~1admin~1risk~1agents~1{id}~1withdrawals~1{wid}~1review'
   /v1/games:
     $ref: './paths/game.yaml#/~1v1~1games'
   /v1/games/{game_id}/config:

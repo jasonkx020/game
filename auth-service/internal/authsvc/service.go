@@ -540,7 +540,7 @@ func (s *Service) Introspect(ctx context.Context, accessToken string) (*token.Cl
 }
 
 func (s *Service) issuePair(ctx context.Context, acc *store.Account) (*TokenPair, error) {
-	access, expiresIn, err := s.tokens.IssueAccess(acc.ID, acc.Role, acc.PrincipalType, acc.PhoneStr(), acc.Nickname)
+	access, expiresIn, err := s.tokens.IssueAccess(acc.ID, acc.Role, acc.PrincipalType, acc.PhoneStr(), acc.Nickname, acc.IsMinor)
 	if err != nil {
 		return nil, err
 	}

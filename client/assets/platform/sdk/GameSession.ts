@@ -7,10 +7,15 @@ import { PushRouter } from './PushRouter'
 import { EntryReq, EntryRsp, BindReq, BindRsp } from '../generated/pitaya/pitaya/connector'
 import { JoinReq, JoinRsp, ReadyReq, ReadyRsp, SyncReq, SyncRsp } from '../generated/pitaya/pitaya/room'
 
+const DEVICE_ID_KEY = 'games.device_id'
+
 export interface EnterRoomParams {
   wsUrl: string
   roomId: string
   accessToken: string
+  /** Optional WGS84 coords; omit to skip GPS risk check */
+  lat?: number
+  lng?: number
 }
 
 export interface GameSessionOptions {
@@ -23,6 +28,27 @@ export interface EnterRoomResult {
   gameId: string
 }
 
+function ensureDeviceId(): string {
+  try {
+    const existing = localStorage.getItem(DEVICE_ID_KEY)
+    if (existing && existing.length >= 8) {
+      return existing
+    }
+  } catch {
+    /* ignore */
+  }
+  const id =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  try {
+    localStorage.setItem(DEVICE_ID_KEY, id)
+  } catch {
+    /* ignore */
+  }
+  return id
+}
+
 export class GameSession {
   readonly pitaya = new PitayaClient()
   readonly tracker = new EventTracker()
@@ -31,6 +57,7 @@ export class GameSession {
   private log: (line: string) => void
   roomId = ''
   mySeat = -1
+  deviceId = ensureDeviceId()
 
   constructor(opts: GameSessionOptions = {}) {
     this.api = opts.api ?? new ApiClient()
@@ -64,12 +91,23 @@ export class GameSession {
     const entryRsp = decodeProto(EntryRsp, entryRspBytes)
     this.log(`[pitaya] entry ok server=${entryRsp.serverVersion}`)
 
-    const bindBytes = encodeProto(BindReq, { accessToken: params.accessToken })
+    const bindBytes = encodeProto(BindReq, {
+      accessToken: params.accessToken,
+      deviceId: this.deviceId,
+    })
     const bindRspBytes = await this.pitaya.request('game.connector.bind', bindBytes)
     const bindRsp = decodeProto(BindRsp, bindRspBytes)
     this.log(`[pitaya] bind uid=${bindRsp.userId}`)
 
-    const joinBytes = encodeProto(JoinReq, { roomId: params.roomId })
+    const joinReq: JoinReq = {
+      roomId: params.roomId,
+      asSpectator: false,
+    }
+    if (typeof params.lat === 'number' && typeof params.lng === 'number') {
+      joinReq.lat = params.lat
+      joinReq.lng = params.lng
+    }
+    const joinBytes = encodeProto(JoinReq, joinReq)
     const joinRspBytes = await this.pitaya.request('game.room.join', joinBytes)
     const joinRsp = decodeProto(JoinRsp, joinRspBytes)
     this.mySeat = joinRsp.seat ?? 0

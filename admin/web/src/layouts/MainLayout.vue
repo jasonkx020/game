@@ -7,6 +7,8 @@
         <el-menu-item index="/users">管理员用户</el-menu-item>
         <el-menu-item index="/players">游戏玩家</el-menu-item>
         <el-menu-item index="/clubs">俱乐部</el-menu-item>
+        <el-menu-item index="/risk">风控告警</el-menu-item>
+        <el-menu-item index="/agents-risk">代理风控</el-menu-item>
         <el-menu-item index="/recharge">Mock 充值</el-menu-item>
         <el-menu-item index="/games">游戏配置</el-menu-item>
         <el-menu-item index="/companion">伴侣人设</el-menu-item>

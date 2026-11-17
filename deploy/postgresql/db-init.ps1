@@ -73,6 +73,14 @@ function Escape-Uri([string]$s) {
     return [uri]::EscapeDataString($s)
 }
 
+# Windows PowerShell 5.1 "UTF8" includes BOM; psql rejects leading U+FEFF on SQL.
+function Write-Utf8NoBom {
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)]$Value)
+    $text = if ($Value -is [System.Array]) { ($Value -join "`n") + "`n" } else { [string]$Value }
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($Path, $text, $utf8)
+}
+
 function Upsert-EnvFile {
     param([string]$Path, [hashtable]$Pairs)
     $dir = Split-Path -Parent $Path
@@ -108,7 +116,7 @@ function Upsert-EnvFile {
     foreach ($k in @($pending.Keys)) {
         $out.Add("$k=$($Pairs[$k])")
     }
-    Set-Content -LiteralPath $Path -Value $out -Encoding UTF8
+    Write-Utf8NoBom -Path $Path -Value $out
 }
 
 if (-not $Psql -or -not (Test-Path -LiteralPath $Psql)) {
@@ -171,8 +179,8 @@ ALTER SCHEMA public OWNER TO $AppUser;
 
 $tmpSql = Join-Path $env:TEMP ("games-db-init-{0}.sql" -f [guid]::NewGuid().ToString('N'))
 $tmpSchema = Join-Path $env:TEMP ("games-db-schema-{0}.sql" -f [guid]::NewGuid().ToString('N'))
-Set-Content -LiteralPath $tmpSql -Value $sql -Encoding UTF8
-Set-Content -LiteralPath $tmpSchema -Value $schemaSql -Encoding UTF8
+Write-Utf8NoBom -Path $tmpSql -Value $sql
+Write-Utf8NoBom -Path $tmpSchema -Value $schemaSql
 
 function Invoke-AdminPsql {
     param([string]$Db, [string]$File)
@@ -217,7 +225,7 @@ $localLines = @(
     "DATABASE_URL=$gameDsn"
     "AUTH_DATABASE_URL=$authDsn"
 )
-Set-Content -LiteralPath $outEnv -Value $localLines -Encoding UTF8
+Write-Utf8NoBom -Path $outEnv -Value $localLines
 Write-Host "Wrote $outEnv"
 
 $shouldWriteEnv = $WriteEnv -or ($WriteEnvCfg -and -not $NoWriteEnv)

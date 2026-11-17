@@ -16,6 +16,7 @@ message EntryRsp {
 
 message BindReq {
   string access_token = 1;  // JWT from HTTP login
+  string device_id = 2;     // stable client device id for risk
 }
 
 message BindRsp {

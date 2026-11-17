@@ -22,7 +22,7 @@ func testTokenManager(t *testing.T, ttl time.Duration) *token.Manager {
 
 func TestParseAllowExpiredAndSubjectBind(t *testing.T) {
 	mgr := testTokenManager(t, 1*time.Second)
-	access, _, err := mgr.IssueAccess(42, token.RolePlayer, token.PrincipalPlayer, "13900000042", "测试")
+	access, _, err := mgr.IssueAccess(42, token.RolePlayer, token.PrincipalPlayer, "13900000042", "测试", false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/example/game/pkg/platform/metrics"
 	"github.com/example/game/pkg/platform/moderation"
 	"github.com/example/game/pkg/platform/player"
+	"github.com/example/game/pkg/platform/risk"
 	"github.com/example/game/pkg/platform/user"
 	"github.com/example/game/pkg/platform/wallet"
 	goredis "github.com/redis/go-redis/v9"
@@ -34,6 +35,7 @@ type Server struct {
 	catalog    *catalog.Service
 	metrics    *metrics.Service
 	moderation *moderation.Service
+	risk       *risk.Service
 	authClient *authclient.Client
 	audit      *audit.Generator
 	rdb        *goredis.Client
@@ -49,6 +51,7 @@ func New(
 	catalog *catalog.Service,
 	metrics *metrics.Service,
 	mod *moderation.Service,
+	riskSvc *risk.Service,
 	authCLI *authclient.Client,
 	gen *audit.Generator,
 	rdb *goredis.Client,
@@ -57,12 +60,15 @@ func New(
 	return &Server{
 		cfg: cfg, admins: admins, players: players, wallet: wallet,
 		clubs: clubs, catalog: catalog, metrics: metrics, moderation: mod,
-		authClient: authCLI, audit: gen, rdb: rdb, db: sqlDB,
+		risk: riskSvc, authClient: authCLI, audit: gen, rdb: rdb, db: sqlDB,
 	}
 }
 
 func (s *Server) Register(r *gin.Engine) {
 	r.Use(gin.Recovery(), httpmw.RequestID(), httpmw.CORS(s.cfg.CORSOrigins))
+
+	// Embedded SPA same-origin login: proxy auth routes to auth-service (:8081).
+	mountAuthProxy(r, s.cfg.AuthBaseURL)
 
 	sig := httpmw.Signature(httpmw.SignatureConfig{
 		AppID: s.cfg.AppID, AppSecret: s.cfg.HMACSecret, Skip: false,
@@ -106,6 +112,16 @@ func (s *Server) Register(r *gin.Engine) {
 				adminPlatform.POST("/users/:user_id/disable", s.disableAdminUser)
 				adminPlatform.POST("/users/:user_id/enable", s.enableAdminUser)
 				adminPlatform.PATCH("/users/:user_id/role", s.patchAdminRole)
+
+				adminPlatform.GET("/risk/alerts", s.listRiskAlerts)
+				adminPlatform.GET("/risk/alerts/:id", s.getRiskAlert)
+				adminPlatform.POST("/risk/alerts/:id/review", s.reviewRiskAlert)
+				adminPlatform.GET("/risk/table-snapshot", s.riskTableSnapshot)
+				adminPlatform.GET("/risk/agents/:id/deposit", s.getAgentDeposit)
+				adminPlatform.POST("/risk/agents/:id/deposit", s.postAgentDeposit)
+				adminPlatform.GET("/risk/agents/:id/withdrawals", s.listAgentWithdrawals)
+				adminPlatform.POST("/risk/agents/:id/withdrawals", s.createAgentWithdrawal)
+				adminPlatform.POST("/risk/agents/:id/withdrawals/:wid/review", s.reviewAgentWithdrawal)
 			}
 		}
 

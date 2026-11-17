@@ -1,6 +1,8 @@
 # Cocos Creator 3 游戏客户端
 
-> Platform SDK + 最小场景脚手架。架构见 [docs/tech/client-architecture.md](../docs/tech/client-architecture.md)。
+> Platform SDK + 最小场景脚手架。  
+> **目录与开发约束**（必读）：[docs/tech/client-structure.md](../docs/tech/client-structure.md)  
+> 架构分层：[docs/tech/client-architecture.md](../docs/tech/client-architecture.md)
 
 ## 前置
 
@@ -86,28 +88,26 @@ Cocos `loadBundle` 会用带 `crossorigin` 的 `<script>` 拉远程包；含脚�
 
 ## 资源目录
 
+完整表与硬约束见 [client-structure.md](../docs/tech/client-structure.md)。摘要：
+
 ```
 assets/
-├── platform/ui/              # 平台主包 UI（登录/大厅壳）
-│   ├── common/               # 通用按钮、背景、Logo
-│   └── lobby/icons/          # 大厅游戏列表本地占位图标（可选）
-├── scripts/scenes/             # 平台场景 + 脚本
-│   ├── Launch.scene / Lobby.scene / Room.scene
-│   └── images/               # 平台场景专用图片
-└── games/{gameId}/           # Remote Bundle（按需下载）
-    ├── *.ts / *.scene        # 游戏逻辑与场景
-    ├── images/               # 图标、小图
-    ├── textures/             # 牌面、棋盘、背景
-    ├── ui/                   # 游戏内 UI
-    └── audio/                # 音效（可选）
+├── platform/                 # 主包：sdk / lobby / companion / host / ui / generated
+├── scripts/scenes/           # Launch / Lobby / Room / Profile
+└── games/{gameId}/           # Remote Bundle（Module + PushHandler + images/textures/ui/audio）
 ```
 
-新游戏：复制 `games/_template/` 目录结构，实现 `{GameId}Module.ts` 与 `GameEntry.ts`，并在编辑器中将 `games/{gameId}/` 设为 Bundle。
+| 层 | 允许依赖 | 禁止 |
+| :--- | :--- | :--- |
+| `platform` | 自身、generated | import `games/*` |
+| `scripts` | `platform/*` | 直接 import 某游戏 |
+| `games/{id}` | `platform/*` | import 其他 `games/{j}` |
 
-初始化或补全资源目录：
+新游戏：复制 `games/_template/`，实现 `{GameId}Module.ts` 与 `GameEntry.ts`，编辑器将目录设为 Bundle。
 
 ```bash
-cd client && node scripts/scaffold-asset-dirs.mjs
+cd client && npm run scaffold:assets   # 补全资源子目录
+cd client && npm test                  # Vitest + import/边界检查
 ```
 
 ## 联调流程
@@ -131,6 +131,7 @@ assets/platform/sdk/
   EventTracker.ts    action_seq 连续性 + sync
   GameSession.ts     进房闭环编排
   ReplayPlayer.ts    回放骨架（P2）
+  config.ts          GAME_* 构建注入 / 本地默认
 assets/games/dawugui/DawuguiPushHandler.ts
 assets/games/liuzichong/LiuzichongPushHandler.ts
 assets/games/liuzichong/LiuzichongBoard.ts
@@ -138,14 +139,15 @@ assets/games/liuzichong/LiuzichongBoard.ts
 
 ## 配置
 
-开发环境默认对齐 `.env.example`：
+开发环境默认（`sdk/config.ts`，未注入全局量时）：
 
 | 项 | 默认 |
 |----|------|
-| API | `http://localhost:8080` |
+| API | `http://localhost:8080`（`GAME_API_BASE`） |
+| Auth | `http://localhost:8081`（`GAME_AUTH_BASE`） |
 | WS | `ws://localhost:3250` |
-| APP_ID | `cocos-dev` |
-| HMAC | `dev-hmac-secret-change-me` |
-| CORS | 需含 Cocos 预览源，默认含 `http://localhost:7456`（见根目录 `.env` 的 `CORS_ORIGINS`） |
+| APP_ID | `cocos-dev`（`GAME_APP_ID`） |
+| HMAC | `dev-hmac-secret-change-me`（`GAME_HMAC_SECRET`） |
+| CORS | 服务端 `CORS_ORIGINS` 需含预览源（如 `http://localhost:7456`） |
 
-可在 Cocos 构建脚本中注入 `GAME_API_BASE` 等全局常量（见 `sdk/config.ts`）。
+构建注入：在 Cocos 构建插件/宏中定义全局 `GAME_HMAC_SECRET` 等（与服务端 `HMAC_SECRET`/`APP_ID` 一致）。仓库无自动 `.env` 注入；详见 [client-structure.md §3.2](../docs/tech/client-structure.md)。

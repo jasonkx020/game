@@ -125,7 +125,7 @@ func dualRefresh(
 	if err != nil || acc.Status != "active" {
 		return nil, authsvc.ErrUnauthorized
 	}
-	access, expIn, err := tokens.IssueAccess(acc.ID, acc.Role, acc.PrincipalType, acc.PhoneStr(), acc.Nickname)
+	access, expIn, err := tokens.IssueAccess(acc.ID, acc.Role, acc.PrincipalType, acc.PhoneStr(), acc.Nickname, acc.IsMinor)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func setup(t *testing.T) (*token.Manager, *fakeRepo, string, string) {
 	acc := &store.Account{ID: 7, PrincipalType: token.PrincipalPlayer, Phone: &phone, Role: token.RolePlayer, Status: "active"}
 	m.accounts[7] = acc
 	repo := &fakeRepo{m: m}
-	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7")
+	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7", false)
 	raw, _ := refreshtoken.NewOpaque()
 	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(24*time.Hour), time.Now().Add(2*time.Minute))
 	return mgr, repo, access, raw
@@ -212,7 +212,7 @@ func TestDualRefreshRejectsTamperedAccess(t *testing.T) {
 
 func TestDualRefreshRejectsSubjectMismatch(t *testing.T) {
 	mgr, repo, _, refresh := setup(t)
-	otherAccess, _, _ := mgr.IssueAccess(99, token.RolePlayer, token.PrincipalPlayer, "13900000099", "p99")
+	otherAccess, _, _ := mgr.IssueAccess(99, token.RolePlayer, token.PrincipalPlayer, "13900000099", "p99", false)
 	if _, err := dualRefresh(mgr, repo, otherAccess, refresh, token.PrincipalPlayer); !errors.Is(err, authsvc.ErrUnauthorized) {
 		t.Fatalf("got %v", err)
 	}
@@ -232,7 +232,7 @@ func TestDualRefreshAllowsExpiredAccess(t *testing.T) {
 	m := newMem()
 	m.accounts[7] = &store.Account{ID: 7, PrincipalType: token.PrincipalPlayer, Role: token.RolePlayer, Status: "active"}
 	repo := &fakeRepo{m: m}
-	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7")
+	access, _, _ := mgr.IssueAccess(7, token.RolePlayer, token.PrincipalPlayer, "13900000007", "p7", false)
 	time.Sleep(1100 * time.Millisecond)
 	raw, _ := refreshtoken.NewOpaque()
 	repo.upsertRefresh(7, refreshtoken.Hash(raw), time.Now().Add(time.Hour), time.Now().Add(2*time.Minute))
