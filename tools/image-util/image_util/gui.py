@@ -11,28 +11,37 @@ from PIL import Image, ImageTk
 
 from .io_batch import load_image, save_image
 from .ops_convert import normalize_format
+from .ops_crop import crop_image
 from .ops_cutout import cutout, parse_rgb
-from .ops_dewatermark import Box, corner_box, dewatermark
+from .ops_dewatermark import Box, clamp_box, corner_box, dewatermark
 from .ops_resize import resize_image
 from .preview import DisplayTransform, clamp_pan, composite_on_checker, fit_preview, overlay_box
+
+_HANDLE = 8  # canvas px hit size for crop handles
+_HANDLE_NAMES = ("nw", "n", "ne", "e", "se", "s", "sw", "w")
 
 
 class ImageUtilApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
-        root.title("Image Util — 缩放 / 转格式 / 去水印 / 抠图")
-        root.geometry("1180x820")
-        root.minsize(960, 680)
+        root.title("Image Util — 缩放 / 转格式 / 去水印 / 抠图 / 裁剪")
+        root.geometry("1180x860")
+        root.minsize(960, 700)
 
         self.src_path: Path | None = None
         self.src_img: Image.Image | None = None
         self.result_img: Image.Image | None = None
         self.left_tf: DisplayTransform | None = None
         self.user_box: Box | None = None
+        self.crop_box: Box | None = None
         self._drag_start: tuple[float, float] | None = None
         self._photo_left: ImageTk.PhotoImage | None = None
         self._photo_right: ImageTk.PhotoImage | None = None
         self._rect_id: int | None = None
+        self._crop_edit: str | None = None  # move | nw|n|ne|... | new
+        self._crop_edit_origin: Box | None = None
+        self._crop_edit_mouse: tuple[float, float] | None = None
+        self._syncing_crop_vars = False
         # Shared view for left/right comparison.
         self.view_zoom = 1.0
         self.view_pan_x = 0.0
@@ -58,11 +67,16 @@ class ImageUtilApp:
         self.apply_dewatermark = BooleanVar(value=True)
         self.refine_inpaint = BooleanVar(value=True)
         self.apply_cutout = BooleanVar(value=False)
+        self.apply_crop = BooleanVar(value=False)
         self.apply_resize = BooleanVar(value=False)
         self.cutout_mode = StringVar(value="birefnet")
         self.cutout_tol = IntVar(value=30)
         self.key_rgb = StringVar(value="255,255,255")
-        # What a mouse drag means: watermark region (default) or cutout subject.
+        self.crop_x = StringVar(value="0")
+        self.crop_y = StringVar(value="0")
+        self.crop_w = StringVar(value="0")
+        self.crop_h = StringVar(value="0")
+        # What a mouse drag means: watermark / cutout subject / crop frame.
         self.select_purpose = StringVar(value="dewatermark")
 
         self._build()
@@ -75,6 +89,7 @@ class ImageUtilApp:
         ttk.Button(top, text="保存", command=self.save_overwrite).pack(side="left", padx=2)
         ttk.Button(top, text="另存为", command=self.save_as).pack(side="left", padx=2)
         ttk.Button(top, text="清除选区", command=self.clear_box).pack(side="left", padx=2)
+        ttk.Button(top, text="应用裁剪", command=self.apply_crop_now).pack(side="left", padx=2)
         ttk.Button(top, text="选区去水印", command=self.dewatermark_selection).pack(side="left", padx=8)
         ttk.Button(top, text="应用预览", command=lambda: self.apply_preview(quick=False)).pack(side="left", padx=2)
         ttk.Button(top, text="重置结果", command=self.reset_preview).pack(side="left", padx=2)
@@ -120,6 +135,9 @@ class ImageUtilApp:
         ttk.Radiobutton(
             row0, text="抠图(选主体)", variable=self.select_purpose, value="cutout", command=self._sync_hints
         ).pack(side="left", padx=4)
+        ttk.Radiobutton(
+            row0, text="裁剪(调框)", variable=self.select_purpose, value="crop", command=self._on_crop_purpose
+        ).pack(side="left", padx=4)
 
         row1 = ttk.Frame(ctrl)
         row1.pack(fill="x", pady=2)
@@ -156,6 +174,21 @@ class ImageUtilApp:
         ttk.Label(row_cut, text="色键RGB").pack(side="left", padx=(8, 2))
         ttk.Entry(row_cut, textvariable=self.key_rgb, width=12).pack(side="left")
         ttk.Label(row_cut, text="(BiRefNet 可框选主体加速)").pack(side="left", padx=8)
+
+        row_crop = ttk.Frame(ctrl)
+        row_crop.pack(fill="x", pady=2)
+        ttk.Checkbutton(row_crop, text="裁剪", variable=self.apply_crop, command=self._on_crop_toggle).pack(side="left")
+        ttk.Label(row_crop, text="X").pack(side="left", padx=(8, 2))
+        ttk.Entry(row_crop, textvariable=self.crop_x, width=6).pack(side="left")
+        ttk.Label(row_crop, text="Y").pack(side="left", padx=(4, 2))
+        ttk.Entry(row_crop, textvariable=self.crop_y, width=6).pack(side="left")
+        ttk.Label(row_crop, text="W").pack(side="left", padx=(4, 2))
+        ttk.Entry(row_crop, textvariable=self.crop_w, width=6).pack(side="left")
+        ttk.Label(row_crop, text="H").pack(side="left", padx=(4, 2))
+        ttk.Entry(row_crop, textvariable=self.crop_h, width=6).pack(side="left")
+        ttk.Button(row_crop, text="写入选区", command=self._crop_vars_to_box).pack(side="left", padx=6)
+        ttk.Button(row_crop, text="居中80%", command=self._init_default_crop).pack(side="left", padx=2)
+        ttk.Label(row_crop, text="拖边/角调大小，拖框内移动").pack(side="left", padx=8)
 
         row2 = ttk.Frame(ctrl)
         row2.pack(fill="x", pady=2)
@@ -216,7 +249,9 @@ class ImageUtilApp:
         self.src_path = path
         self.src_img = img
         self.user_box = None
+        self.crop_box = None
         self.result_img = None
+        self._box_to_crop_vars()
         self.reset_view(redraw=False)
         self.status.set(f"已打开: {path.name} ({img.size[0]}x{img.size[1]})")
         self._redraw_left()
@@ -224,6 +259,10 @@ class ImageUtilApp:
 
     def clear_box(self) -> None:
         self.user_box = None
+        if self.select_purpose.get() == "crop":
+            self.crop_box = None
+            self.apply_crop.set(False)
+            self._box_to_crop_vars()
         self._redraw_left()
         self.status.set("已清除框选。")
 
@@ -238,9 +277,88 @@ class ImageUtilApp:
             self.select_purpose.set("cutout")
         self._sync_hints()
 
+    def _on_crop_toggle(self) -> None:
+        if self.apply_crop.get():
+            self.select_purpose.set("crop")
+            if self.crop_box is None and self.src_img is not None:
+                self._init_default_crop()
+            self._sync_hints()
+            self._redraw_left()
+            self.apply_preview(quick=True)
+        else:
+            self._sync_hints()
+
+    def _on_crop_purpose(self) -> None:
+        self.apply_crop.set(True)
+        if self.crop_box is None and self.src_img is not None:
+            self._init_default_crop()
+        self._sync_hints()
+        self._redraw_left()
+
+    def _init_default_crop(self) -> None:
+        if self.src_img is None:
+            return
+        ow, oh = self.src_img.size
+        w = max(1, int(ow * 0.8))
+        h = max(1, int(oh * 0.8))
+        x = max(0, (ow - w) // 2)
+        y = max(0, (oh - h) // 2)
+        self.crop_box = clamp_box((x, y, w, h), ow, oh)
+        self.apply_crop.set(True)
+        self._box_to_crop_vars()
+        self._redraw_left()
+        self.status.set(f"裁剪框：x={x},y={y},w={w},h={h}（可拖动/调大小）")
+
+    def _box_to_crop_vars(self) -> None:
+        self._syncing_crop_vars = True
+        try:
+            if self.crop_box is None:
+                self.crop_x.set("0")
+                self.crop_y.set("0")
+                self.crop_w.set("0")
+                self.crop_h.set("0")
+            else:
+                x, y, w, h = self.crop_box
+                self.crop_x.set(str(x))
+                self.crop_y.set(str(y))
+                self.crop_w.set(str(w))
+                self.crop_h.set(str(h))
+        finally:
+            self._syncing_crop_vars = False
+
+    def _crop_vars_to_box(self) -> None:
+        if self.src_img is None or self._syncing_crop_vars:
+            return
+        try:
+            x = int(self.crop_x.get().strip() or "0")
+            y = int(self.crop_y.get().strip() or "0")
+            w = int(self.crop_w.get().strip() or "0")
+            h = int(self.crop_h.get().strip() or "0")
+        except ValueError:
+            messagebox.showinfo("提示", "裁剪 X/Y/W/H 需为整数")
+            return
+        self.crop_box = clamp_box((x, y, w, h), *self.src_img.size)
+        self.apply_crop.set(True)
+        self._box_to_crop_vars()
+        self._redraw_left()
+        self.apply_preview(quick=True)
+
+    def apply_crop_now(self) -> None:
+        if self.src_img is None:
+            messagebox.showinfo("提示", "请先打开图片")
+            return
+        if self.crop_box is None:
+            self._init_default_crop()
+        self.apply_crop.set(True)
+        self.select_purpose.set("crop")
+        self.apply_preview(quick=True)
+
     def _sync_hints(self) -> None:
-        if self.select_purpose.get() == "cutout":
+        purpose = self.select_purpose.get()
+        if purpose == "cutout":
             self.left_hint.set("原图：BiRefNet 抠图（可框选主体加速）；滚轮缩放；Ctrl+拖动平移")
+        elif purpose == "crop":
+            self.left_hint.set("原图：拖出裁剪框；拖框内移动，拖边/角调大小；Ctrl+拖动平移")
         else:
             self.left_hint.set("原图：框选水印去水印；滚轮缩放；Ctrl+拖动平移查看边角")
 
@@ -424,6 +542,9 @@ class ImageUtilApp:
                 key_rgb=key,
                 lite=bool(preview),
             )
+        if self.apply_crop.get() and self.crop_box is not None:
+            # If earlier ops changed size (e.g. dewatermark crop mode), clamp to current.
+            out = crop_image(out, self.crop_box)
         if self.apply_resize.get():
             w = int(self.width_var.get()) if self.width_var.get().strip() else None
             h = int(self.height_var.get()) if self.height_var.get().strip() else None
@@ -490,6 +611,8 @@ class ImageUtilApp:
                     )
                 if self.apply_cutout.get():
                     parts.append(f"抠图:{self.cutout_mode.get()}")
+                if self.apply_crop.get() and self.crop_box is not None:
+                    parts.append(f"裁剪:{self.crop_box[2]}x{self.crop_box[3]}")
                 if self.apply_resize.get():
                     parts.append("缩放")
                 tag = " + ".join(parts) if parts else "原图"
@@ -541,15 +664,109 @@ class ImageUtilApp:
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("保存失败", str(e))
 
+    def _crop_canvas_rect(self) -> tuple[float, float, float, float] | None:
+        if self.crop_box is None or self.left_tf is None:
+            return None
+        x, y, w, h = self.crop_box
+        tf = self.left_tf
+        x0, y0 = tf.image_to_canvas(x, y)
+        x1, y1 = tf.image_to_canvas(x + w, y + h)
+        return x0, y0, x1, y1
+
+    def _crop_handle_points(self) -> dict[str, tuple[float, float]]:
+        r = self._crop_canvas_rect()
+        if r is None:
+            return {}
+        x0, y0, x1, y1 = r
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        return {
+            "nw": (x0, y0),
+            "n": (mx, y0),
+            "ne": (x1, y0),
+            "e": (x1, my),
+            "se": (x1, y1),
+            "s": (mx, y1),
+            "sw": (x0, y1),
+            "w": (x0, my),
+        }
+
+    def _hit_crop_edit(self, cx: float, cy: float) -> str | None:
+        """Return handle name, 'move', or None."""
+        handles = self._crop_handle_points()
+        for name, (hx, hy) in handles.items():
+            if abs(cx - hx) <= _HANDLE and abs(cy - hy) <= _HANDLE:
+                return name
+        r = self._crop_canvas_rect()
+        if r is None:
+            return None
+        x0, y0, x1, y1 = r
+        if min(x0, x1) <= cx <= max(x0, x1) and min(y0, y1) <= cy <= max(y0, y1):
+            return "move"
+        return None
+
+    def _apply_crop_edit(self, cx: float, cy: float) -> None:
+        if self.src_img is None or self.left_tf is None or self._crop_edit is None or self._crop_edit_mouse is None:
+            return
+        mode = self._crop_edit
+        if mode != "new" and self._crop_edit_origin is None:
+            return
+        ow, oh = self.src_img.size
+        mx0, my0 = self._crop_edit_mouse
+        ix0, iy0 = self.left_tf.canvas_to_image(mx0, my0)
+        ix1, iy1 = self.left_tf.canvas_to_image(cx, cy)
+        dx, dy = ix1 - ix0, iy1 - iy0
+        if mode == "new":
+            x = min(ix0, ix1)
+            y = min(iy0, iy1)
+            w = max(1, abs(ix1 - ix0))
+            h = max(1, abs(iy1 - iy0))
+        else:
+            assert self._crop_edit_origin is not None
+            ox, oy, ow_box, oh_box = self._crop_edit_origin
+            x, y, w, h = ox, oy, ow_box, oh_box
+            if mode == "move":
+                x, y = ox + dx, oy + dy
+            else:
+                x2, y2 = ox + ow_box, oy + oh_box
+                if mode in ("w", "nw", "sw"):
+                    x = ox + dx
+                if mode in ("e", "ne", "se"):
+                    x2 = ox + ow_box + dx
+                if mode in ("n", "nw", "ne"):
+                    y = oy + dy
+                if mode in ("s", "sw", "se"):
+                    y2 = oy + oh_box + dy
+                if x2 < x:
+                    x, x2 = x2, x
+                if y2 < y:
+                    y, y2 = y2, y
+                w, h = x2 - x, y2 - y
+        self.crop_box = clamp_box((int(round(x)), int(round(y)), int(round(w)), int(round(h))), ow, oh)
+        self._box_to_crop_vars()
+
     def _on_press(self, event) -> None:  # noqa: ANN001
         if self.src_img is None:
             return
         # Ctrl + drag = pan (so corners remain reachable when zoomed).
         if self._ctrl_held(event):
             self._drag_start = None
+            self._crop_edit = None
             self._on_pan_start(event)
             return
         self._panning = False
+
+        if self.select_purpose.get() == "crop":
+            hit = self._hit_crop_edit(event.x, event.y) if self.crop_box is not None else None
+            self._crop_edit = hit or "new"
+            self._crop_edit_origin = self.crop_box
+            self._crop_edit_mouse = (event.x, event.y)
+            self._drag_start = (event.x, event.y)
+            if self._crop_edit == "new":
+                self.crop_box = None
+            self.apply_crop.set(True)
+            return
+
+        self._crop_edit = None
         self._drag_start = (event.x, event.y)
         if self._rect_id is not None:
             self.left_canvas.delete(self._rect_id)
@@ -558,6 +775,10 @@ class ImageUtilApp:
     def _on_drag(self, event) -> None:  # noqa: ANN001
         if self._panning or self._pan_start is not None:
             self._on_pan_drag(event)
+            return
+        if self.select_purpose.get() == "crop" and self._crop_edit is not None:
+            self._apply_crop_edit(event.x, event.y)
+            self._redraw_left()
             return
         if self._drag_start is None:
             return
@@ -572,6 +793,20 @@ class ImageUtilApp:
         if self._panning or self._pan_start is not None:
             self._on_pan_end(event)
             return
+
+        if self.select_purpose.get() == "crop" and self._crop_edit is not None:
+            self._apply_crop_edit(event.x, event.y)
+            self._crop_edit = None
+            self._crop_edit_origin = None
+            self._crop_edit_mouse = None
+            self._drag_start = None
+            if self.crop_box is not None:
+                x, y, w, h = self.crop_box
+                self.status.set(f"裁剪框：x={x},y={y},w={w},h={h}")
+                self.apply_preview(debounce_ms=30, quick=True)
+            self._redraw_left()
+            return
+
         if self._drag_start is None or self.left_tf is None or self.src_img is None:
             self._drag_start = None
             return
@@ -615,6 +850,35 @@ class ImageUtilApp:
             "pan_y": self.view_pan_y,
         }
 
+    def _draw_crop_overlay(self) -> None:
+        """Draw crop rectangle + handles in canvas coordinates."""
+        r = self._crop_canvas_rect()
+        if r is None:
+            return
+        x0, y0, x1, y1 = r
+        # Dim outside first, then border/handles on top.
+        cw = max(1, self.left_canvas.winfo_width())
+        ch = max(1, self.left_canvas.winfo_height())
+        dim = {"fill": "#000000", "stipple": "gray50", "outline": "", "tags": "crop_ui"}
+        self.left_canvas.create_rectangle(0, 0, cw, min(y0, y1), **dim)
+        self.left_canvas.create_rectangle(0, max(y0, y1), cw, ch, **dim)
+        self.left_canvas.create_rectangle(0, min(y0, y1), min(x0, x1), max(y0, y1), **dim)
+        self.left_canvas.create_rectangle(max(x0, x1), min(y0, y1), cw, max(y0, y1), **dim)
+        self.left_canvas.create_rectangle(
+            x0, y0, x1, y1, outline="#3ddc97", width=2, dash=(6, 3), tags="crop_ui"
+        )
+        for hx, hy in self._crop_handle_points().values():
+            self.left_canvas.create_rectangle(
+                hx - 4,
+                hy - 4,
+                hx + 4,
+                hy + 4,
+                fill="#3ddc97",
+                outline="#ffffff",
+                width=1,
+                tags="crop_ui",
+            )
+
     def _redraw_left(self) -> None:
         if self.src_img is None:
             self.left_canvas.delete("all")
@@ -625,19 +889,22 @@ class ImageUtilApp:
             self.src_img, max_side=4096, canvas_w=cw, canvas_h=ch, **self._view_kwargs()
         )
         self.left_tf = tf
-        box = self._active_box()
-        if box is not None:
-            # Map image box onto preview pixels (without canvas offset).
-            x, y, w, h = box
-            sx = int(round(x * tf.scale))
-            sy = int(round(y * tf.scale))
-            sw = max(1, int(round(w * tf.scale)))
-            sh = max(1, int(round(h * tf.scale)))
-            preview = overlay_box(preview.convert("RGBA"), (sx, sy, sw, sh))
+        # Watermark / cutout selection overlay (not crop).
+        if self.select_purpose.get() != "crop":
+            box = self._active_box()
+            if box is not None:
+                x, y, w, h = box
+                sx = int(round(x * tf.scale))
+                sy = int(round(y * tf.scale))
+                sw = max(1, int(round(w * tf.scale)))
+                sh = max(1, int(round(h * tf.scale)))
+                preview = overlay_box(preview.convert("RGBA"), (sx, sy, sw, sh))
         self._photo_left = ImageTk.PhotoImage(preview)
         self.left_canvas.delete("all")
         self.left_canvas.create_image(tf.offset_x, tf.offset_y, anchor="nw", image=self._photo_left)
         self._rect_id = None
+        if self.select_purpose.get() == "crop" or self.apply_crop.get():
+            self._draw_crop_overlay()
 
     def _redraw_right(self) -> None:
         img = self.result_img

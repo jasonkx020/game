@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .io_batch import collect_inputs, default_out_path, load_image, map_batch_out, save_image
 from .ops_convert import normalize_format
+from .ops_crop import crop_image
 from .ops_cutout import cutout, parse_rgb
 from .ops_dewatermark import Box, dewatermark
 from .ops_resize import resize_image
@@ -81,7 +82,14 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--quality", type=int, default=90)
     m.set_defaults(_fn="cutout")
 
-    p = sub.add_parser("process", help="optional dewatermark/cutout then resize/convert")
+    cr = sub.add_parser("crop", help="crop by x,y,w,h")
+    _add_io(cr)
+    cr.add_argument("--box", type=_parse_box, required=True, help="x,y,w,h original pixels")
+    cr.add_argument("--format", default=None)
+    cr.add_argument("--quality", type=int, default=90)
+    cr.set_defaults(_fn="crop")
+
+    p = sub.add_parser("process", help="optional dewatermark/cutout/crop then resize/convert")
     _add_io(p)
     p.add_argument("--mode", choices=("crop", "inpaint"), default="inpaint")
     p.add_argument("--corner", choices=("tl", "tr", "bl", "br", "auto"), default="br")
@@ -92,6 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cutout", choices=("birefnet", "flood", "colorkey"), default=None)
     p.add_argument("--tolerance", type=int, default=30)
     p.add_argument("--key", type=_parse_rgb_arg, default="255,255,255")
+    p.add_argument("--crop-box", type=_parse_box, default=None, help="final crop x,y,w,h")
     p.add_argument("--width", type=int, default=None)
     p.add_argument("--height", type=int, default=None)
     p.add_argument("--max-side", type=int, default=None)
@@ -197,6 +206,15 @@ def _run_cutout(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_crop(args: argparse.Namespace) -> int:
+    for src, dest in _iter_jobs(args):
+        img = load_image(src)
+        out = crop_image(img, args.box)
+        save_image(out, dest, fmt=args.format or dest.suffix.lstrip("."), quality=args.quality)
+        print(f"OK crop {src} -> {dest} size={out.size}")
+    return 0
+
+
 def _run_process(args: argparse.Namespace) -> int:
     key = args.key if isinstance(args.key, tuple) else parse_rgb(str(args.key))
     for src, dest in _iter_jobs(args):
@@ -220,6 +238,8 @@ def _run_process(args: argparse.Namespace) -> int:
                 tolerance=args.tolerance,
                 key_rgb=key,
             )
+        if args.crop_box is not None:
+            out = crop_image(out, args.crop_box)
         if args.width or args.height or args.max_side:
             out = resize_image(
                 out,
@@ -260,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_dewatermark(args)
     if args._fn == "cutout":
         return _run_cutout(args)
+    if args._fn == "crop":
+        return _run_crop(args)
     if args._fn == "process":
         return _run_process(args)
     parser.print_help()

@@ -38,9 +38,19 @@ python -m image_util
 3. 导出 **PNG** 保留透明  
 4. 备选：`flood` / `colorkey`（无模型）
 
+### 裁剪（可动态调框）
+
+1. 「框选用途」选 **裁剪(调框)**，或勾选「裁剪」  
+2. 拖出裁剪框；**拖框内移动**，**拖边/角调大小**  
+3. 也可用 X/Y/W/H 数值精确调整后点「写入选区」  
+4. 「应用裁剪」或「应用预览」查看结果  
+
 ## CLI
 
 ```powershell
+# 裁剪
+python -m image_util crop .\in.png -o .\out.png --box 100,80,800,600
+
 # BiRefNet 抠图
 python -m image_util cutout .\in.png -o .\cut.png --mode birefnet
 python -m image_util cutout .\in.png -o .\cut.png --mode birefnet --box 40,30,500,600
