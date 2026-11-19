@@ -10,6 +10,8 @@ from .ops_convert import normalize_format
 from .ops_crop import crop_image
 from .ops_cutout import cutout, parse_rgb
 from .ops_dewatermark import Box, dewatermark
+from .ops_grayscale import grayscale_image
+from .ops_idphoto import ID_PHOTO_SPECS, list_id_photo_specs, make_id_photo, resolve_bg_rgb
 from .ops_resize import resize_image
 
 
@@ -88,6 +90,32 @@ def build_parser() -> argparse.ArgumentParser:
     cr.add_argument("--format", default=None)
     cr.add_argument("--quality", type=int, default=90)
     cr.set_defaults(_fn="crop")
+
+    gs = sub.add_parser("grayscale", help="desaturate whole image or a box region")
+    _add_io(gs)
+    gs.add_argument("--amount", type=float, default=1.0, help="0=unchanged, 1=full gray")
+    gs.add_argument("--box", type=_parse_box, default=None, help="optional region x,y,w,h")
+    gs.add_argument("--format", default=None)
+    gs.add_argument("--quality", type=int, default=90)
+    gs.set_defaults(_fn="grayscale")
+
+    idp = sub.add_parser("idphoto", help="ID photo: exam/national specs, BiRefNet + solid bg")
+    idp.add_argument("input", nargs="?", default=None, help="image file or directory")
+    idp.add_argument("-o", "--output", default=None, help="output file or directory")
+    idp.add_argument("--inplace", action="store_true", help="overwrite inputs (dangerous)")
+    idp.add_argument("--bg", choices=("blue", "red", "white"), default=None, help="default follows --size spec")
+    idp.add_argument("--bg-rgb", type=_parse_rgb_arg, default=None, help="custom R,G,B overrides --bg")
+    idp.add_argument(
+        "--size",
+        choices=tuple(ID_PHOTO_SPECS.keys()),
+        default="gwy",
+        help="gwy=公务员/事业编报名一寸电子等",
+    )
+    idp.add_argument("--list-sizes", action="store_true", help="print size catalog and exit")
+    idp.add_argument("--box", type=_parse_box, default=None, help="optional subject ROI x,y,w,h")
+    idp.add_argument("--format", default="jpg")
+    idp.add_argument("--quality", type=int, default=95)
+    idp.set_defaults(_fn="idphoto")
 
     p = sub.add_parser("process", help="optional dewatermark/cutout/crop then resize/convert")
     _add_io(p)
@@ -215,6 +243,38 @@ def _run_crop(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_grayscale(args: argparse.Namespace) -> int:
+    for src, dest in _iter_jobs(args):
+        img = load_image(src)
+        out = grayscale_image(img, amount=args.amount, box=args.box)
+        save_image(out, dest, fmt=args.format or dest.suffix.lstrip("."), quality=args.quality)
+        print(f"OK grayscale {src} -> {dest}")
+    return 0
+
+
+def _run_idphoto(args: argparse.Namespace) -> int:
+    if args.list_sizes:
+        for key, spec in list_id_photo_specs():
+            if spec.pixels is None:
+                px = "keep"
+            else:
+                px = f"{spec.pixels[0]}x{spec.pixels[1]}"
+            print(f"{key:12} {px:12} bg={spec.default_bg:5}  {spec.label}  — {spec.note}")
+        return 0
+    if not args.input:
+        raise SystemExit("idphoto requires input (or use --list-sizes)")
+    spec = ID_PHOTO_SPECS[args.size]
+    bg_name = args.bg if args.bg is not None else spec.default_bg
+    bg = resolve_bg_rgb(bg_name, bg_rgb=args.bg_rgb)
+    for src, dest in _iter_jobs(args):
+        img = load_image(src)
+        out = make_id_photo(img, bg_rgb=bg, size_key=args.size, box=args.box)
+        fmt = args.format or "jpg"
+        save_image(out, dest, fmt=fmt, quality=args.quality)
+        print(f"OK idphoto {src} -> {dest} size={out.size} bg={bg} spec={args.size}")
+    return 0
+
+
 def _run_process(args: argparse.Namespace) -> int:
     key = args.key if isinstance(args.key, tuple) else parse_rgb(str(args.key))
     for src, dest in _iter_jobs(args):
@@ -282,6 +342,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_cutout(args)
     if args._fn == "crop":
         return _run_crop(args)
+    if args._fn == "grayscale":
+        return _run_grayscale(args)
+    if args._fn == "idphoto":
+        return _run_idphoto(args)
     if args._fn == "process":
         return _run_process(args)
     parser.print_help()
