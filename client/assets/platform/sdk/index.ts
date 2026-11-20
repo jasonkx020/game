@@ -1,4 +1,5 @@
 export { ApiClient } from './ApiClient'
+export type { DiscoveryAssignResult, AssignedConnector } from './ApiClient'
 export { PitayaClient } from './PitayaClient'
 export { GameSession } from './GameSession'
 export { EventTracker } from './EventTracker'

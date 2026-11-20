@@ -22,6 +22,7 @@
 | 006 | [006-game-lobby-dynamic-bundle.md](006-game-lobby-dynamic-bundle.md) | Accepted | 游戏大厅 API 驱动、Remote Bundle、用户偏好 |
 | 007 | [007-companion-llm.md](007-companion-llm.md) | Accepted | 智能伴侣 LLM、Tool Calling、SSE |
 | 008 | [008-game-host-sdk.md](008-game-host-sdk.md) | Accepted | 独立发布与 GameHostSDK 双入口 |
+| 009 | [009-connector-redis-discovery.md](009-connector-redis-discovery.md) | Accepted | Connector→Redis；game-api 按用户单点分配；auth 不参与发现 |
 
 **已 superseded（未单独成文）：** 自研 WS Gateway + RoomActor + Envelope 主帧方案（见 [proto/DEPRECATED.md](../proto/DEPRECATED.md)）。
 

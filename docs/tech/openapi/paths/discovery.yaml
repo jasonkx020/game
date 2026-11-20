@@ -1,0 +1,33 @@
+/v1/discovery/assign:
+  get:
+    tags:
+      - Discovery
+    summary: 按用户分配应连接的 Connector（不下发全量）
+    description: |
+      服务端在存活 Connector 集合上对 user_id 做 consistent hash，只返回网关 URL 与 **一个** connector。
+      连接失败时可带 exclude_id 重新分配。客户端不得据此探测其它未下发节点。
+    operationId: assignConnector
+    security:
+      - bearerAuth: []
+        signatureAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/XAppId'
+      - $ref: '../components/parameters.yaml#/XTimestamp'
+      - $ref: '../components/parameters.yaml#/XNonce'
+      - $ref: '../components/parameters.yaml#/XContentSha256'
+      - $ref: '../components/parameters.yaml#/XSignature'
+      - name: exclude_id
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 上次分配连不上的 connector.id，服务端在剩余存活集中再选
+    responses:
+      '200':
+        description: 成功
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/DiscoveryAssignResponse'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

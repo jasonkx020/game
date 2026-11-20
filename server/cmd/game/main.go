@@ -21,6 +21,7 @@ import (
 	"github.com/example/game/internal/pitaya/opskick"
 	"github.com/example/game/internal/pitaya/runtime"
 	"github.com/example/game/internal/platform/actionlog"
+	"github.com/example/game/internal/platform/discovery"
 	"github.com/example/game/pkg/audit"
 	"github.com/example/game/pkg/config"
 	"github.com/example/game/pkg/db"
@@ -86,6 +87,21 @@ func main() {
 	kickCtx, kickCancel := context.WithCancel(context.Background())
 	defer kickCancel()
 	opskick.StartSubscribe(kickCtx, rdb)
+
+	discCtx, discCancel := context.WithCancel(context.Background())
+	defer discCancel()
+	pub := discovery.NewPublisher(rdb, discovery.PublisherConfig{
+		Enabled:     cfg.DiscoveryEnabled,
+		InstanceID:  cfg.ConnectorInstanceID,
+		WSURL:       cfg.PitayaWSURL,
+		WSDirectURL: cfg.ConnectorWSDirectURL,
+		Version:     "0.1.0",
+	})
+	if err := pub.Start(discCtx); err != nil {
+		slog.Error("discovery publish", "err", err)
+		os.Exit(1)
+	}
+	defer pub.Stop(context.Background())
 
 	slog.Info("game server listening", "addr", cfg.PitayaWSAddr())
 	pitaya.Start()

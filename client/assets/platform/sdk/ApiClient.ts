@@ -38,6 +38,19 @@ export interface CreateRoomResult {
   entryScene?: string
 }
 
+export interface AssignedConnector {
+  id: string
+  wsUrl: string
+  wsDirectUrl?: string
+}
+
+/** Per-user assignment — never a full connector list. */
+export interface DiscoveryAssignResult {
+  wsGatewayUrl?: string
+  httpGatewayUrl?: string
+  connector?: AssignedConnector
+}
+
 export interface GameBundleInfo {
   version: string
   url: string
@@ -539,6 +552,32 @@ export class ApiClient {
   async joinRoom(roomId: string): Promise<{ wsUrl: string }> {
     const res = await this.post<{ ws_url: string }>(`/v1/rooms/${roomId}/join`, {})
     return { wsUrl: res.ws_url }
+  }
+
+  /**
+   * Server assigns exactly one connector for this user (no full list).
+   * Pass excludeId after a failed connect to get a different live node.
+   */
+  async assignConnector(excludeId?: string): Promise<DiscoveryAssignResult> {
+    const q = excludeId ? `?exclude_id=${encodeURIComponent(excludeId)}` : ''
+    const res = await this.get<{
+      ws_gateway_url?: string
+      http_gateway_url?: string
+      connector?: { id: string; ws_url: string; ws_direct_url?: string }
+    }>(`/v1/discovery/assign${q}`)
+    return {
+      wsGatewayUrl: res.ws_gateway_url ? String(res.ws_gateway_url) : undefined,
+      httpGatewayUrl: res.http_gateway_url ? String(res.http_gateway_url) : undefined,
+      connector: res.connector
+        ? {
+            id: String(res.connector.id),
+            wsUrl: String(res.connector.ws_url),
+            wsDirectUrl: res.connector.ws_direct_url
+              ? String(res.connector.ws_direct_url)
+              : undefined,
+          }
+        : undefined,
+    }
   }
 
   private mapProfile(res: {

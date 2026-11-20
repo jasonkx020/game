@@ -191,8 +191,8 @@ ADR：[005-ordered-action-log-replay.md](adr/005-ordered-action-log-replay.md)
 
 | 阶段 | 拓扑 |
 | :--- | :--- |
-| MVP | Gin + Pitaya Standalone 同机 |
-| 成长期 | Pitaya **Cluster**：connector Frontend + game Backend + NATS + etcd |
+| MVP | Gin + Pitaya Standalone 同机；Connector 自注册 Redis，game-api `GET /v1/discovery/assign` 按用户单点分配（见 [ADR-009](adr/009-connector-redis-discovery.md)） |
+| 成长期 | Pitaya **Cluster**：connector Frontend + game Backend + NATS + etcd；Frontend 写 Redis，assign 契约不变 |
 | 成熟期 | 多 connector + PG 主从 |
 
 ---

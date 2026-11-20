@@ -37,6 +37,13 @@ type Config struct {
 
 	RiskGPSHardBlock bool
 	RiskAutoFreeze   bool
+
+	// Connector discovery (ADR-009): cmd/game publishes; game-api assigns.
+	DiscoveryEnabled     bool
+	ConnectorInstanceID  string
+	ConnectorWSDirectURL string
+	WSGatewayURL         string
+	HTTPGatewayURL       string
 }
 
 func Load() (*Config, error) {
@@ -63,6 +70,7 @@ func Load() (*Config, error) {
 	v.SetDefault("JWT_PUBLIC_KEY_FILE", "keys/jwt-es256-dev.pub.pem")
 	v.SetDefault("RISK_GPS_HARD_BLOCK", false)
 	v.SetDefault("RISK_AUTO_FREEZE", false)
+	v.SetDefault("DISCOVERY_ENABLED", true)
 
 	if envPath := findEnvFile(); envPath != "" {
 		v.SetConfigFile(envPath)
@@ -78,27 +86,39 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DatabaseURL:       v.GetString("DATABASE_URL"),
-		RedisURL:          v.GetString("REDIS_URL"),
-		HMACSecret:        v.GetString("HMAC_SECRET"),
-		AppID:             v.GetString("APP_ID"),
-		DevSMSCode:        v.GetString("DEV_SMS_CODE"),
-		ListenHost:        firstNonEmpty(v.GetString("HTTP_LISTEN_HOST"), "0.0.0.0"),
-		GameAPIHTTPPort:   firstNonEmpty(v.GetString("GAME_API_HTTP_PORT"), v.GetString("PLATFORM_HTTP_PORT"), "8080"),
-		AdminHTTPPort:     firstNonEmpty(v.GetString("ADMIN_HTTP_PORT"), "8082"),
-		PitayaWSPort:      v.GetInt("PITAYA_WS_PORT"),
-		PitayaWSURL:       v.GetString("PITAYA_WS_URL"),
-		SnowflakeWorkerID: v.GetInt64("SNOWFLAKE_WORKER_ID"),
-		CORSOrigins:       corsOrigins,
-		LLMBaseURL:        v.GetString("LLM_BASE_URL"),
-		LLMAPIKey:         v.GetString("LLM_API_KEY"),
-		LLMModel:          v.GetString("LLM_MODEL"),
-		LLMTimeoutSec:     v.GetInt("LLM_TIMEOUT_SEC"),
-		AuthBaseURL:       firstNonEmpty(v.GetString("AUTH_BASE_URL"), "http://localhost:8081"),
-		JWTPublicKeyPEM:   v.GetString("JWT_PUBLIC_KEY_PEM"),
-		JWTPublicKeyFile:  resolveKeyPath(v.GetString("JWT_PUBLIC_KEY_FILE")),
-		RiskGPSHardBlock:  v.GetBool("RISK_GPS_HARD_BLOCK"),
-		RiskAutoFreeze:    v.GetBool("RISK_AUTO_FREEZE"),
+		DatabaseURL:          v.GetString("DATABASE_URL"),
+		RedisURL:             v.GetString("REDIS_URL"),
+		HMACSecret:           v.GetString("HMAC_SECRET"),
+		AppID:                v.GetString("APP_ID"),
+		DevSMSCode:           v.GetString("DEV_SMS_CODE"),
+		ListenHost:           firstNonEmpty(v.GetString("HTTP_LISTEN_HOST"), "0.0.0.0"),
+		GameAPIHTTPPort:      firstNonEmpty(v.GetString("GAME_API_HTTP_PORT"), v.GetString("PLATFORM_HTTP_PORT"), "8080"),
+		AdminHTTPPort:        firstNonEmpty(v.GetString("ADMIN_HTTP_PORT"), "8082"),
+		PitayaWSPort:         v.GetInt("PITAYA_WS_PORT"),
+		PitayaWSURL:          v.GetString("PITAYA_WS_URL"),
+		SnowflakeWorkerID:    v.GetInt64("SNOWFLAKE_WORKER_ID"),
+		CORSOrigins:          corsOrigins,
+		LLMBaseURL:           v.GetString("LLM_BASE_URL"),
+		LLMAPIKey:            v.GetString("LLM_API_KEY"),
+		LLMModel:             v.GetString("LLM_MODEL"),
+		LLMTimeoutSec:        v.GetInt("LLM_TIMEOUT_SEC"),
+		AuthBaseURL:          firstNonEmpty(v.GetString("AUTH_BASE_URL"), "http://localhost:8081"),
+		JWTPublicKeyPEM:      v.GetString("JWT_PUBLIC_KEY_PEM"),
+		JWTPublicKeyFile:     resolveKeyPath(v.GetString("JWT_PUBLIC_KEY_FILE")),
+		RiskGPSHardBlock:     v.GetBool("RISK_GPS_HARD_BLOCK"),
+		RiskAutoFreeze:       v.GetBool("RISK_AUTO_FREEZE"),
+		DiscoveryEnabled:     v.GetBool("DISCOVERY_ENABLED"),
+		ConnectorInstanceID:  strings.TrimSpace(v.GetString("CONNECTOR_INSTANCE_ID")),
+		ConnectorWSDirectURL: strings.TrimSpace(v.GetString("CONNECTOR_WS_DIRECT_URL")),
+		WSGatewayURL:         strings.TrimSpace(v.GetString("WS_GATEWAY_URL")),
+		HTTPGatewayURL:       strings.TrimSpace(v.GetString("HTTP_GATEWAY_URL")),
+	}
+	if cfg.ConnectorInstanceID == "" {
+		cfg.ConnectorInstanceID = "game-" + strings.TrimPrefix(cfg.PitayaWSURL, "ws://")
+		cfg.ConnectorInstanceID = strings.ReplaceAll(cfg.ConnectorInstanceID, "/", "-")
+	}
+	if cfg.WSGatewayURL == "" {
+		cfg.WSGatewayURL = cfg.PitayaWSURL
 	}
 
 	pemBytes, err := user.ResolvePEM(cfg.JWTPublicKeyPEM, cfg.JWTPublicKeyFile)

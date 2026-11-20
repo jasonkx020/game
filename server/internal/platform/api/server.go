@@ -12,6 +12,7 @@ import (
 	"github.com/example/game/pkg/platform/catalog"
 	"github.com/example/game/pkg/platform/club"
 	"github.com/example/game/internal/platform/companion"
+	"github.com/example/game/internal/platform/discovery"
 	"github.com/example/game/pkg/httpmw"
 	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/pkg/platform/player"
@@ -36,6 +37,7 @@ type Server struct {
 	risk      *risk.Service
 	audit     *audit.Generator
 	rdb       *goredis.Client
+	discovery *discovery.Registry
 }
 
 func New(
@@ -51,11 +53,12 @@ func New(
 	riskSvc *risk.Service,
 	gen *audit.Generator,
 	rdb *goredis.Client,
+	disc *discovery.Registry,
 ) *Server {
 	return &Server{
 		cfg: cfg, players: players, wallet: wallet, rooms: rooms,
 		clubs: clubs, catalog: catalog, lobby: lobbySvc, companion: companionSvc,
-		replay: replaySvc, risk: riskSvc, audit: gen, rdb: rdb,
+		replay: replaySvc, risk: riskSvc, audit: gen, rdb: rdb, discovery: disc,
 	}
 }
 
@@ -115,6 +118,8 @@ func (s *Server) Register(r *gin.Engine) {
 			auth.POST("/rooms", s.createRoom)
 			auth.GET("/rooms/:room_id", s.getRoom)
 			auth.POST("/rooms/:room_id/join", s.joinRoom)
+
+			auth.GET("/discovery/assign", s.assignConnector)
 		}
 	}
 }

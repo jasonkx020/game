@@ -206,6 +206,36 @@ CreateRoomResponse:
       type: integer
       format: int64
 
+AssignedConnector:
+  type: object
+  required:
+    - id
+    - ws_url
+  properties:
+    id:
+      type: string
+    ws_url:
+      type: string
+      format: uri
+    ws_direct_url:
+      type: string
+      format: uri
+      description: 可选直连地址（与 ws_url 同节点）
+
+DiscoveryAssignResponse:
+  type: object
+  properties:
+    ws_gateway_url:
+      type: string
+      format: uri
+      description: 常态优先连接的网关 WSS/WS
+    http_gateway_url:
+      type: string
+      format: uri
+    connector:
+      $ref: '#/AssignedConnector'
+      description: 为本用户选出的唯一 Connector；无存活节点时可缺省
+
 RoomSummary:
   type: object
   required:

@@ -42,6 +42,8 @@ tags:
     description: 运营审计与报表
   - name: Admin
     description: 运营后台（非登录类）
+  - name: Discovery
+    description: Connector 发现（按用户单点分配，不下发全量）
 
 security:
   - bearerAuth: []
@@ -128,6 +130,8 @@ paths:
     $ref: './paths/replay.yaml#/~1v1~1rounds~1{round_id}~1events'
   /v1/admin/audit/actions:
     $ref: './paths/replay.yaml#/~1v1~1admin~1audit~1actions'
+  /v1/discovery/assign:
+    $ref: './paths/discovery.yaml#/~1v1~1discovery~1assign'
 
 components:
   securitySchemes:
@@ -199,6 +203,10 @@ components:
       $ref: './components/schemas.yaml#/MatchListResponse'
     AuditActionQueryResponse:
       $ref: './components/schemas.yaml#/AuditActionQueryResponse'
+    DiscoveryAssignResponse:
+      $ref: './components/schemas.yaml#/DiscoveryAssignResponse'
+    AssignedConnector:
+      $ref: './components/schemas.yaml#/AssignedConnector'
   responses:
     BadRequest:
       $ref: './components/responses.yaml#/BadRequest'

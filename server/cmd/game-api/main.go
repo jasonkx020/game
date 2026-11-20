@@ -1,26 +1,28 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/example/game/internal/platform/api"
+	"github.com/example/game/internal/platform/companion"
+	"github.com/example/game/internal/platform/companion/llm"
+	"github.com/example/game/internal/platform/discovery"
+	"github.com/example/game/internal/platform/lobby"
+	"github.com/example/game/internal/platform/replay"
+	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/pkg/audit"
 	"github.com/example/game/pkg/config"
 	"github.com/example/game/pkg/db"
 	"github.com/example/game/pkg/ginutil"
-	"github.com/example/game/internal/platform/api"
 	"github.com/example/game/pkg/platform/catalog"
 	"github.com/example/game/pkg/platform/club"
-	"github.com/example/game/internal/platform/companion"
-	"github.com/example/game/internal/platform/companion/llm"
-	"github.com/example/game/internal/platform/lobby"
 	"github.com/example/game/pkg/platform/player"
-	"github.com/example/game/internal/platform/replay"
 	"github.com/example/game/pkg/platform/risk"
-	"github.com/example/game/internal/platform/room"
 	"github.com/example/game/pkg/platform/wallet"
 	iredis "github.com/example/game/pkg/redis"
 )
@@ -67,7 +69,18 @@ func main() {
 		AutoFreeze:   cfg.RiskAutoFreeze,
 	})
 
-	srv := api.New(cfg, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, replaySvc, riskSvc, gen, rdb)
+	discCtx, discCancel := context.WithCancel(context.Background())
+	defer discCancel()
+	var discReg *discovery.Registry
+	if cfg.DiscoveryEnabled {
+		discReg = discovery.NewRegistry(rdb, discovery.RegistryConfig{
+			WSGatewayURL:   cfg.WSGatewayURL,
+			HTTPGatewayURL: cfg.HTTPGatewayURL,
+		})
+		discReg.Start(discCtx)
+	}
+
+	srv := api.New(cfg, players, wallets, rooms, clubs, catalogSvc, lobbySvc, companionSvc, replaySvc, riskSvc, gen, rdb, discReg)
 	r := gin.Default()
 	srv.Register(r)
 
